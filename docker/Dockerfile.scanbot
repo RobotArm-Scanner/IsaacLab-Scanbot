@@ -1,0 +1,184 @@
+# Everything past this stage is to install
+# ROS2 Humble
+
+# What is the docker name suffix for the base image to load? (defaults to empty string)
+ARG DOCKER_NAME_SUFFIX=""
+
+FROM isaac-lab-base${DOCKER_NAME_SUFFIX} AS scanbot
+
+# Which ROS2 apt package to install
+ARG ROS2_APT_PACKAGE
+# Whether to install VNC/XFCE (TRUE/FALSE)
+ARG USE_VNC
+# Whether to install Node.js via NVM (TRUE/FALSE)
+ARG USE_NODEJS
+# Node.js version for NVM (e.g., v22.14.0)
+ARG NODE_VERSION
+# Whether to install RISE (TRUE/FALSE)
+ARG INSTALL_RISE
+# Which CUDA toolchain to use for RISE prerequisites (e.g., cu117 or cu128)
+ARG RISE_VERSION
+# Whether to install and enable SSH server (TRUE/FALSE)
+ARG USE_SSH_SERVER
+# SSH port to configure when installing the SSH server
+ARG SSH_PORT
+# Whether to install VS Code (code-server) (TRUE/FALSE)
+ARG USE_VSCODE
+# Whether to install PyCharm via tarball script (TRUE/FALSE)
+ARG USE_PYCHARM
+# Direct download URL for PyCharm tarball
+ARG PYCHARM_URL
+
+# ROS2 Humble Apt installations
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    # Install ROS2 Humble \
+    software-properties-common && \
+    add-apt-repository universe && \
+    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo jammy) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    ros-humble-${ROS2_APT_PACKAGE} \
+    ros-humble-vision-msgs \
+    # Install both FastRTPS and CycloneDDS
+    ros-humble-rmw-cyclonedds-cpp \
+    ros-humble-rmw-fastrtps-cpp \
+    # This includes various dev tools including colcon
+    ros-dev-tools && \
+    # Install rosdeps for extensions that declare a ros_ws in
+    # their extension.toml
+    ${ISAACLAB_PATH}/isaaclab.sh -p ${ISAACLAB_PATH}/tools/install_deps.py rosdep ${ISAACLAB_PATH}/source && \
+    apt -y autoremove && apt clean autoclean && \
+    rm -rf /var/lib/apt/lists/* && \
+    # Add sourcing of setup.bash to .bashrc
+    echo "source /opt/ros/humble/setup.bash" >> ${HOME}/.bashrc
+
+# Copy the RMW specifications for ROS2
+# https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_ros.html
+COPY docker/.ros/ ${DOCKER_USER_HOME}/.ros/
+
+# ScanBot Teams Settings
+
+# Install custom dependency
+RUN apt-get update && apt-get install -y --no-install-recommends nano vim
+RUN ${ISAACLAB_PATH}/isaaclab.sh -p -m pip install open3d==0.18.0
+
+# Optionally install VNC/XFCE; controlled by USE_VNC build arg
+RUN --mount=type=cache,target=/var/cache/apt \
+    if [ "${USE_VNC}" = "TRUE" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends \
+        xfce4 \
+        xfce4-goodies \
+        tigervnc-standalone-server && \
+      mkdir -p /root/.vnc && \
+      printf "#!/bin/sh\nunset SESSION_MANAGER\nunset DBUS_SESSION_BUS_ADDRESS\nstartxfce4 &\n" > /root/.vnc/xstartup && \
+      chmod +x /root/.vnc/xstartup && \
+      apt -y autoremove && apt clean autoclean && \
+      rm -rf /var/lib/apt/lists/*; \
+    else \
+      echo "Skipping VNC install (USE_VNC=${USE_VNC})"; \
+    fi
+
+## Optionally install VS Code via code-server install script
+RUN if [ "${USE_VSCODE}" = "TRUE" ]; then \
+      cd /root && \
+      curl -fsSL https://code-server.dev/install.sh | sh | tee code-server-install.log; \
+    else \
+      echo "Skipping VS Code (code-server) install (USE_VSCODE=${USE_VSCODE})"; \
+    fi
+
+# Install PyCharm via given script when USE_PYCHARM=TRUE (assumes PYCHARM_URL set)
+RUN if [ "${USE_PYCHARM}" = "TRUE" ]; then \
+      cd /root && \
+      apt-get update && apt-get install -y --no-install-recommends wget tar ca-certificates && \
+      wget -O pycharm.tar.gz "${PYCHARM_URL}" && \
+      tar -xzvf pycharm.tar.gz && \
+      rm pycharm.tar.gz && \
+      sh $(find ./ -maxdepth 1 -name "pycharm*")/bin/remote-dev-server.sh registerBackendLocationForGateway && \
+      sed -i  "s/-Xmx[0-9]\+m/-Xmx8192m/g" $(find $(find ./ -maxdepth 1 -name "pycharm*")/bin/ -name "*.vmoptions") && \
+      apt -y autoremove && apt clean autoclean && rm -rf /var/lib/apt/lists/*; \
+    else \
+      echo "Skipping PyCharm install (USE_PYCHARM=${USE_PYCHARM})"; \
+    fi
+
+# Optionally install Node.js & global tools using NVM (multi-line for readability)
+RUN mkdir -p /usr/local/nvm && \
+    export NVM_DIR=/usr/local/nvm && \
+    if [ "${USE_NODEJS}" = "TRUE" ]; then \
+      curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash; \
+      export NVM_DIR=/usr/local/nvm; \
+      . "$NVM_DIR/nvm.sh"; \
+      nvm install ${NODE_VERSION}; \
+      nvm use --delete-prefix ${NODE_VERSION}; \
+      npm config delete registry || true; \
+      npm config set registry https://registry.npmjs.org/ || true; \
+      npm install -g yarn http-server @openai/codex; \
+      NODE_PATH=$NVM_DIR/versions/node/${NODE_VERSION}/bin; \
+      ln -sf "$NODE_PATH/node" /usr/bin/node; \
+      ln -sf "$NODE_PATH/npm" /usr/bin/npm; \
+      ln -sf "$NODE_PATH/yarn" /usr/bin/yarn; \
+    else \
+      echo "Skipping Node.js install (USE_NODEJS=${USE_NODEJS})"; \
+    fi
+
+ENV CONDA_DIR=/opt/conda
+RUN wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh && \
+    bash /tmp/miniconda.sh -b -p $CONDA_DIR && \
+    rm /tmp/miniconda.sh && \
+    $CONDA_DIR/bin/conda clean -ya
+ENV PATH=$CONDA_DIR/bin:$PATH
+
+RUN conda init bash && \
+    conda config --set auto_activate_base false && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+
+COPY docker/scripts/isaaclab-conda-hooks /usr/src/isaaclab-conda-hooks
+RUN chmod 644 -R /usr/src/isaaclab-conda-hooks
+RUN conda install -n base -y conda-build && \
+    conda build /usr/src/isaaclab-conda-hooks/recipe && \
+    conda config --add channels local && \
+    conda config --add create_default_packages isaaclab-conda-hooks && \
+    conda install -n base -y isaaclab-conda-hooks
+
+# Optionally install RISE; controlled by INSTALL_RISE build arg
+COPY docker/scripts/install-rise-prerequisites-cu117.sh /usr/src/install-rise-prerequisites-cu117.sh
+COPY docker/scripts/install-rise-prerequisites-cu128.sh /usr/src/install-rise-prerequisites-cu128.sh
+RUN if [ "${INSTALL_RISE}" = "TRUE" ]; then \
+      echo "Installing RISE (INSTALL_RISE=${INSTALL_RISE}, RISE_VERSION=${RISE_VERSION})" && \
+      cd /usr/src && \
+      if [ "${RISE_VERSION}" = "cu117" ]; then \
+        bash install-rise-prerequisites-cu117.sh; \
+      elif [ "${RISE_VERSION}" = "cu128" ]; then \
+        bash install-rise-prerequisites-cu128.sh; \
+      else \
+        echo "Unsupported RISE_VERSION='${RISE_VERSION}'. Use cu117 or cu128." && exit 1; \
+      fi; \
+    else \
+      echo "Skipping RISE install (INSTALL_RISE=${INSTALL_RISE})"; \
+    fi
+
+# Create a minimal startup script unconditionally; commands may be appended later
+RUN printf "#!/bin/bash\n" > /usr/sbin/startup && chmod +x /usr/sbin/startup
+
+# Entrypoint script: always calls startup
+RUN printf "#!/bin/bash\n/bin/bash /usr/sbin/startup\n" > /usr/sbin/entrypoint && chmod +x /usr/sbin/entrypoint
+
+# Optionally install and configure OpenSSH server; controlled by USE_SSH_SERVER build arg
+RUN --mount=type=cache,target=/var/cache/apt \
+    if [ "${USE_SSH_SERVER}" = "TRUE" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends openssh-server && \
+      mkdir -p /var/run/sshd && \
+      sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+      (grep -q '^PasswordAuthentication' /etc/ssh/sshd_config && sed -ri 's/^#?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config) || echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config && \
+      if grep -qE '^[#[:space:]]*Port[[:space:]]+' /etc/ssh/sshd_config; then sed -ri "s/^[#[:space:]]*Port[[:space:]]+.*/Port ${SSH_PORT}/" /etc/ssh/sshd_config; else echo "Port ${SSH_PORT}" >> /etc/ssh/sshd_config; fi && \
+      echo "root:password" | chpasswd && \
+      printf "service ssh start\n" >> /usr/sbin/startup && \
+      apt -y autoremove && apt clean autoclean && rm -rf /var/lib/apt/lists/*; \
+    else \
+      echo "Skipping SSH server install (USE_SSH_SERVER=${USE_SSH_SERVER})"; \
+    fi
+
+WORKDIR /workspace/isaaclab
+CMD ["/bin/bash", "-c" , "/bin/bash /usr/sbin/entrypoint && tail -f /dev/null"]

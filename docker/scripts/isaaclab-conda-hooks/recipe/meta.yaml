@@ -1,0 +1,11 @@
+package:
+  name: isaaclab-conda-hooks
+  version: 0.1.0
+
+build:
+  noarch: generic
+  number: 0
+
+about:
+  summary: "Conda activate/deactivate hooks to toggle IsaacLab aliases based on CONDA_SHLVL."
+  license: MIT

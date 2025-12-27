@@ -69,6 +69,22 @@ x-default-isaac-lab-volumes: &default-isaac-lab-volumes
   - type: bind
     source: .isaac-lab-docker-history
     target: ${DOCKER_USER_HOME}/.bash_history
+    # Custom directory binding
+  - type: bind
+    source: ../piper_isaac_sim
+    target: ${DOCKER_ISAACLAB_PATH}/piper_isaac_sim
+  - type: bind
+    source: ../models
+    target: ${DOCKER_ISAACLAB_PATH}/models
+  - type: bind
+    source: ../scanbot
+    target: ${DOCKER_ISAACLAB_PATH}/scanbot
+  - type: bind
+    source: /mnt/scanbot
+    target: /mnt/scanbot
+  - type: bind
+    source: ../.git
+    target: ${DOCKER_ISAACLAB_PATH}/.git
 
 x-default-isaac-lab-environment: &default-isaac-lab-environment
   - ISAACSIM_PATH=${DOCKER_ISAACLAB_PATH}/_isaac_sim
@@ -127,6 +143,44 @@ services:
         - DOCKER_NAME_SUFFIX=${DOCKER_NAME_SUFFIX-}
     image: isaac-lab-ros2${DOCKER_NAME_SUFFIX-}
     container_name: isaac-lab-ros2${DOCKER_NAME_SUFFIX-}
+    environment: *default-isaac-lab-environment
+    volumes: *default-isaac-lab-volumes
+    network_mode: host
+    deploy: *default-isaac-lab-deploy
+    # This is the entrypoint for the container
+    entrypoint: bash
+    stdin_open: true
+    tty: true
+
+  isaac-lab-scanbot:
+    profiles: [ "scanbot" ]
+    env_file:
+      - .env.base
+      - .env.ros2
+      - .env.scanbot
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.scanbot
+      args:
+        # ROS2_APT_PACKAGE will default to NONE. This is to
+        # avoid a warning message when building only the base profile
+        # with the .env.base file
+        - ROS2_APT_PACKAGE=${ROS2_APT_PACKAGE:-NONE}
+        # Make sure that the correct Docker Name Suffix is being passed to the dockerfile, to know which base image to
+        # start from.
+        - DOCKER_NAME_SUFFIX=${DOCKER_NAME_SUFFIX-}
+        - INSTALL_RISE=${INSTALL_RISE:-FALSE}
+        - RISE_VERSION=${RISE_VERSION:-cu117}
+        - USE_VNC=${USE_VNC:-TRUE}
+        - USE_NODEJS=${USE_NODEJS:-TRUE}
+        - NODE_VERSION=${NODE_VERSION:-v22.14.0}
+        - USE_SSH_SERVER=${USE_SSH_SERVER:-FALSE}
+        - SSH_PORT=${SSH_PORT:-1222}
+        - USE_VSCODE=${USE_VSCODE:-FALSE}
+        - USE_PYCHARM=${USE_PYCHARM:-FALSE}
+        - PYCHARM_URL=${PYCHARM_URL-}
+    image: isaac-lab-scanbot${DOCKER_NAME_SUFFIX-}
+    container_name: isaac-lab-scanbot${DOCKER_NAME_SUFFIX-}
     environment: *default-isaac-lab-environment
     volumes: *default-isaac-lab-volumes
     network_mode: host
