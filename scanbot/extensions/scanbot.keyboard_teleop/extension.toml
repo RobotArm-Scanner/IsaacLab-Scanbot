@@ -1,0 +1,18 @@
+[package]
+title = "Scanbot Keyboard Teleop"
+description = "WASDQE teleop for Piper via keyboard."
+version = "0.1.0"
+category = "robotics"
+authors = ["Scanbot"]
+
+[dependencies]
+"omni.kit.uiapp" = {}
+
+[core]
+reloadable = true
+
+[[python.module]]
+name = "scanbot.keyboard_teleop"
+
+[scanbot]
+disabled = false

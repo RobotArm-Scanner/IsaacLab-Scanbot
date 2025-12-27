@@ -1,0 +1,20 @@
+[package]
+title = "Scanbot Core"
+description = "Core utilities and shared state for Scanbot extensions."
+version = "0.1.0"
+category = "robotics"
+authors = ["Scanbot"]
+
+[dependencies]
+"omni.kit.uiapp" = {}
+"omni.kit.viewport.window" = {}
+"omni.ui" = {}
+
+[core]
+reloadable = true
+
+[[python.module]]
+name = "scanbot.core"
+
+[scanbot]
+disabled = false

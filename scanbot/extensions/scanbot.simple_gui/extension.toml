@@ -1,0 +1,18 @@
+[package]
+title = "Scanbot Simple GUI"
+description = "Minimal omni.ui extension example that shows a small control panel."
+version = "0.1.0"
+category = "robotics"
+authors = ["Scanbot"]
+
+[dependencies]
+"omni.kit.uiapp" = {}
+"omni.ui" = {}
+
+[core]
+
+[[python.module]]
+name = "scanbot.simple_gui"
+
+[scanbot]
+disabled = false

@@ -1,0 +1,18 @@
+[package]
+title = "Scanbot Random Pose"
+description = "Adds a button to send the robot arm to a random joint pose using dynamic control."
+version = "0.1.0"
+category = "robotics"
+authors = ["Scanbot"]
+
+[dependencies]
+"omni.kit.uiapp" = {}
+"omni.ui" = {}
+
+[core]
+
+[[python.module]]
+name = "scanbot.random_pose"
+
+[scanbot]
+disabled = true

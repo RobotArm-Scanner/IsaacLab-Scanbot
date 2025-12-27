@@ -1,0 +1,16 @@
+[package]
+title = "Scanbot Extension Manager"
+description = "Enables/reloads Scanbot extensions from a single manager extension."
+version = "0.1.0"
+category = "robotics"
+authors = ["Scanbot"]
+
+[dependencies]
+"omni.kit.uiapp" = {}
+"omni.kit.async_engine" = {}
+
+[core]
+reloadable = false
+
+[[python.module]]
+name = "scanbot.extension_manager"
