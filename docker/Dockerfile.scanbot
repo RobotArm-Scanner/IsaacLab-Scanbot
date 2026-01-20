@@ -51,14 +51,20 @@ RUN --mount=type=cache,target=/var/cache/apt \
     ${ISAACLAB_PATH}/isaaclab.sh -p ${ISAACLAB_PATH}/tools/install_deps.py rosdep ${ISAACLAB_PATH}/source && \
     apt -y autoremove && apt clean autoclean && \
     rm -rf /var/lib/apt/lists/* && \
-    # Add sourcing of setup.bash to .bashrc
-    echo "source /opt/ros/humble/setup.bash" >> ${HOME}/.bashrc
+    # Add sourcing of ROS 2 + ScanBot overlay to .bashrc
+    echo "source /opt/ros/humble/setup.bash" >> ${HOME}/.bashrc && \
+    echo "if [ -f /workspace/isaaclab/scanbot/ros2/install/setup.bash ]; then source /workspace/isaaclab/scanbot/ros2/install/setup.bash; fi" >> ${HOME}/.bashrc
 
 # Copy the RMW specifications for ROS2
 # https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_ros.html
 COPY docker/.ros/ ${DOCKER_USER_HOME}/.ros/
 
 # ScanBot Teams Settings
+
+# Pre-install ScanBot ROS2 message setup script in the image and build scanbot_msgs
+COPY scanbot/ros2/setup_scanbot_msgs.sh /usr/local/bin/setup_scanbot_msgs.sh
+RUN chmod +x /usr/local/bin/setup_scanbot_msgs.sh && \
+    /usr/local/bin/setup_scanbot_msgs.sh
 
 # Install custom dependency
 RUN apt-get update && apt-get install -y --no-install-recommends nano vim

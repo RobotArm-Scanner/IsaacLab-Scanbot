@@ -1,0 +1,17 @@
+# Goal
+geometry_msgs/PoseStamped target
+float64 pos_tolerance
+float64 rot_tolerance
+float64 timeout_sec
+---
+# Result
+bool success
+string message
+float64 pos_error
+float64 rot_error
+---
+# Feedback
+float64 pos_error
+float64 rot_error
+float64 elapsed_sec
+

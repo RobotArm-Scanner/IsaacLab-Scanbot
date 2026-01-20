@@ -1,0 +1,15 @@
+# Goal
+string[] name
+float64[] position
+float64 tolerance
+float64 timeout_sec
+---
+# Result
+bool success
+string message
+float64 max_abs_error
+---
+# Feedback
+float64 max_abs_error
+float64 elapsed_sec
+
