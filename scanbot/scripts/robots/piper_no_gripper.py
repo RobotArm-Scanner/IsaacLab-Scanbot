@@ -1,3 +1,5 @@
+import os
+
 import isaaclab.sim as sim_utils
 from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.assets.articulation import ArticulationCfg
@@ -10,7 +12,15 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR, ISAACLAB_NUCLEUS_DIR
 PIPER_NO_GRIPPER_CFG = ArticulationCfg(
     # --- 1. 스폰(Spawn) 설정 ---
     spawn=sim_utils.UsdFileCfg(
-        usd_path="/workspace/isaaclab/piper_isaac_sim/usd/piper_no_gripper_description/piper_no_gripper_description.usd",
+        usd_path=os.path.join(
+            os.environ.get("ISAACLAB_PATH", "/workspace/isaaclab"),
+            "scanbot",
+            "resources",
+            "piper_isaac_sim",
+            "usd",
+            "piper_no_gripper_description",
+            "piper_no_gripper_description.usd",
+        ),
 
         # 물리 속성은 Franka 예시와 유사하게 설정할 수 있습니다.
         rigid_props=sim_utils.RigidBodyPropertiesCfg(

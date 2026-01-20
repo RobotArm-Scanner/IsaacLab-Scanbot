@@ -71,9 +71,6 @@ x-default-isaac-lab-volumes: &default-isaac-lab-volumes
     target: ${DOCKER_USER_HOME}/.bash_history
     # Custom directory binding
   - type: bind
-    source: ../piper_isaac_sim
-    target: ${DOCKER_ISAACLAB_PATH}/piper_isaac_sim
-  - type: bind
     source: ../models
     target: ${DOCKER_ISAACLAB_PATH}/models
   - type: bind

@@ -110,7 +110,13 @@ class ScanbotEnvCfg(BasicEnvCfg):
 
         support_properties = RigidBodyPropertiesCfg(kinematic_enabled=True, disable_gravity=True)
 
-        my_usd_path = str(os.path.abspath("/workspace/isaaclab/piper_isaac_sim/usd/mouth/Mouth_open_wo_tooth_root.usd"))
+        piper_root = os.path.join(
+            os.environ.get("ISAACLAB_PATH", "/workspace/isaaclab"),
+            "scanbot",
+            "resources",
+            "piper_isaac_sim",
+        )
+        my_usd_path = os.path.join(piper_root, "usd", "mouth", "Mouth_open_wo_tooth_root.usd")
 
         print(f"[DEBUG] usd_path (final str): {my_usd_path}")
 
@@ -156,15 +162,13 @@ class ScanbotEnvCfg(BasicEnvCfg):
         )
 
         # Prefer TAA; no DLSS requirement.
-        self.sim.render.antialiasing_mode = "TAA"
+        self.sim.render.antialiasing_mode = "Off"
 
         # Use Piper no-gripper asset under {ENV_REGEX_NS}/Robot
         self.scene.robot = PIPER_NO_GRIPPER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
         # Visual tool on link6 (non-rigid)
-        tool_usd_path = str(
-            os.path.abspath("/workspace/isaaclab/piper_isaac_sim/usd/tools/case_with_scanner_colored.usd")
-        )
+        tool_usd_path = os.path.join(piper_root, "usd", "tools", "case_with_scanner_colored.usd")
         self.scene.tool = AssetBaseCfg(
             prim_path="{ENV_REGEX_NS}/Robot/link6/tool",
             spawn=UsdFileCfg(
@@ -213,25 +217,25 @@ class ScanbotEnvCfg(BasicEnvCfg):
             ),
         )
 
-        # Free wrist camera used for dataset capture (independent of robot-mounted wrist camera)
-        self.scene.free_wrist_camera = CameraCfg(
-            prim_path="{ENV_REGEX_NS}/free_wrist_camera",
-            update_period=0.1,
-            height=480,
-            width=640,
-            data_types=["rgb", "distance_to_image_plane"],
-            spawn=sim_utils.PinholeCameraCfg(
-                focal_length=30.0,
-                focus_distance=400.0,
-                horizontal_aperture=20.955,
-                clipping_range=(0.001, 0.3),
-            ),
-            update_latest_camera_pose=True,
-        )
+        # Free wrist camera used for dataset capture (disabled; keep only wrist_camera)
+        # self.scene.free_wrist_camera = CameraCfg(
+        #     prim_path="{ENV_REGEX_NS}/free_wrist_camera",
+        #     update_period=0.1,
+        #     height=480,
+        #     width=640,
+        #     data_types=["rgb"],
+        #     spawn=sim_utils.PinholeCameraCfg(
+        #         focal_length=30.0,
+        #         focus_distance=400.0,
+        #         horizontal_aperture=20.955,
+        #         clipping_range=(0.001, 0.3),
+        #     ),
+        #     update_latest_camera_pose=True,
+        # )
 
         self.scene.global_camera = CameraCfg(
             prim_path="{ENV_REGEX_NS}/global_camera",
-            update_period=0.0,
+            update_period=0.1,
             height=720,
             width=1280,
             data_types=["rgb", "distance_to_image_plane"],
@@ -251,102 +255,102 @@ class ScanbotEnvCfg(BasicEnvCfg):
             ),
         )
 
-        self.scene.robot_camera = CameraCfg(
-            prim_path="{ENV_REGEX_NS}/robot_camera",
-            update_period=0.0,
-            height=720,
-            width=1280,
-            data_types=["rgb", "distance_to_image_plane"],
-            spawn=sim_utils.PinholeCameraCfg(
-                focal_length=18.14756,
-                focus_distance=400.0,
-                f_stop=0.0,
-                horizontal_aperture=20.955,
-                vertical_aperture=15.2908,
-                clipping_range=(0.01, 1_000_000.0),
-                lock_camera=True,
-            ),
-            offset=CameraCfg.OffsetCfg(
-                pos=(0.22656 + 0.15, 0.49178, 0.67233),
-                rot=(5.549534652183772e-17, -2.5877905075098294e-17, -0.42261826174069944, -0.9063077870366499),
-                convention="opengl",
-            ),
-        )
+        # Robot camera (disabled; keep only wrist_camera)
+        # self.scene.robot_camera = CameraCfg(
+        #     prim_path="{ENV_REGEX_NS}/robot_camera",
+        #     update_period=0.0,
+        #     height=720,
+        #     width=1280,
+        #     data_types=["rgb"],
+        #     spawn=sim_utils.PinholeCameraCfg(
+        #         focal_length=18.14756,
+        #         focus_distance=400.0,
+        #         f_stop=0.0,
+        #         horizontal_aperture=20.955,
+        #         vertical_aperture=15.2908,
+        #         clipping_range=(0.01, 1_000_000.0),
+        #         lock_camera=True,
+        #     ),
+        #     offset=CameraCfg.OffsetCfg(
+        #         pos=(0.22656 + 0.15, 0.49178, 0.67233),
+        #         rot=(5.549534652183772e-17, -2.5877905075098294e-17, -0.42261826174069944, -0.9063077870366499),
+        #         convention="opengl",
+        #     ),
+        # )
 
-        self.scene.mouth_camera = CameraCfg(
-            prim_path="{ENV_REGEX_NS}/mouth_camera",
-            update_period=0.0,
-            height=720,
-            width=1280,
-            data_types=["rgb", "distance_to_image_plane"],
-            spawn=sim_utils.PinholeCameraCfg(
-                focal_length=18.14756,
-                focus_distance=400.0,
-                f_stop=0.0,
-                horizontal_aperture=20.955,
-                vertical_aperture=15.2908,
-                clipping_range=(0.01, 1_000_000.0),
-                lock_camera=True,
-            ),
-            offset=CameraCfg.OffsetCfg(
-                pos=(0.28186 + 0.15, 0.0, 0.2763),
-                rot=(0.6408746357270946, 0.2987970904839335, -0.2987970904839335, -0.6408746357270945),
-                convention="opengl",
-            ),
-        )
+        # Mouth camera (disabled; keep only wrist_camera)
+        # self.scene.mouth_camera = CameraCfg(
+        #     prim_path="{ENV_REGEX_NS}/mouth_camera",
+        #     update_period=0.0,
+        #     height=720,
+        #     width=1280,
+        #     data_types=["rgb"],
+        #     spawn=sim_utils.PinholeCameraCfg(
+        #         focal_length=18.14756,
+        #         focus_distance=400.0,
+        #         f_stop=0.0,
+        #         horizontal_aperture=20.955,
+        #         vertical_aperture=15.2908,
+        #         clipping_range=(0.01, 1_000_000.0),
+        #         lock_camera=True,
+        #     ),
+        #     offset=CameraCfg.OffsetCfg(
+        #         pos=(0.28186 + 0.15, 0.0, 0.2763),
+        #         rot=(0.6408746357270946, 0.2987970904839335, -0.2987970904839335, -0.6408746357270945),
+        #         convention="opengl",
+        #     ),
+        # )
 
-        self.scene.mouth_left_camera = CameraCfg(
-            prim_path="{ENV_REGEX_NS}/mouth_left_camera",
-            update_period=0.0,
-            height=720,
-            width=1280,
-            data_types=["rgb", "distance_to_image_plane"],
-            spawn=sim_utils.PinholeCameraCfg(
-                focal_length=18.14756,
-                focus_distance=400.0,
-                f_stop=0.0,
-                horizontal_aperture=20.955,
-                vertical_aperture=15.2908,
-                clipping_range=(0.01, 1_000_000.0),
-                lock_camera=True,
-            ),
-            offset=CameraCfg.OffsetCfg(
-                pos=(0.4, 0.15, 0.1763),
-                rot=(0.2705980500730985, 0.27059805007309845, -0.6532814824381882, -0.6532814824381883),
-                convention="opengl",
-            ),
-        )
+        # Mouth left camera (disabled; keep only wrist_camera)
+        # self.scene.mouth_left_camera = CameraCfg(
+        #     prim_path="{ENV_REGEX_NS}/mouth_left_camera",
+        #     update_period=0.0,
+        #     height=720,
+        #     width=1280,
+        #     data_types=["rgb"],
+        #     spawn=sim_utils.PinholeCameraCfg(
+        #         focal_length=18.14756,
+        #         focus_distance=400.0,
+        #         f_stop=0.0,
+        #         horizontal_aperture=20.955,
+        #         vertical_aperture=15.2908,
+        #         clipping_range=(0.01, 1_000_000.0),
+        #         lock_camera=True,
+        #     ),
+        #     offset=CameraCfg.OffsetCfg(
+        #         pos=(0.4, 0.15, 0.1763),
+        #         rot=(0.2705980500730985, 0.27059805007309845, -0.6532814824381882, -0.6532814824381883),
+        #         convention="opengl",
+        #     ),
+        # )
 
-        self.scene.mouth_right_camera = CameraCfg(
-            prim_path="{ENV_REGEX_NS}/mouth_right_camera",
-            update_period=0.0,
-            height=720,
-            width=1280,
-            data_types=["rgb", "distance_to_image_plane"],
-            spawn=sim_utils.PinholeCameraCfg(
-                focal_length=18.14756,
-                focus_distance=400.0,
-                f_stop=0.0,
-                horizontal_aperture=20.955,
-                vertical_aperture=15.2908,
-                clipping_range=(0.01, 1_000_000.0),
-                lock_camera=True,
-            ),
-            offset=CameraCfg.OffsetCfg(
-                pos=(0.4, -0.15, 0.1763),
-                rot=(0.6532814824381883, 0.6532814824381882, -0.2705980500730985, -0.27059805007309845),
-                convention="opengl",
-            ),
-        )
+        # Mouth right camera (disabled; keep only wrist_camera)
+        # self.scene.mouth_right_camera = CameraCfg(
+        #     prim_path="{ENV_REGEX_NS}/mouth_right_camera",
+        #     update_period=0.0,
+        #     height=720,
+        #     width=1280,
+        #     data_types=["rgb"],
+        #     spawn=sim_utils.PinholeCameraCfg(
+        #         focal_length=18.14756,
+        #         focus_distance=400.0,
+        #         f_stop=0.0,
+        #         horizontal_aperture=20.955,
+        #         vertical_aperture=15.2908,
+        #         clipping_range=(0.01, 1_000_000.0),
+        #         lock_camera=True,
+        #     ),
+        #     offset=CameraCfg.OffsetCfg(
+        #         pos=(0.4, -0.15, 0.1763),
+        #         rot=(0.6532814824381883, 0.6532814824381882, -0.2705980500730985, -0.27059805007309845),
+        #         convention="opengl",
+        #     ),
+        # )
 
         # Surface cameras in policy observations if needed downstream
         self.image_obs_list = [
             "wrist_camera",
             "global_camera",
-            "robot_camera",
-            "mouth_camera",
-            "mouth_left_camera",
-            "mouth_right_camera",
         ]
 
         self.actions.arm_action = DifferentialInverseKinematicsActionCfg(

@@ -77,12 +77,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "urdf_path",
         nargs="?",
-        default="/workspace/isaaclab/piper_isaac_sim/usd/piper_no_gripper_description_transmission.urdf",
+        default="/workspace/isaaclab/scanbot/resources/piper_isaac_sim/usd/piper_no_gripper_description_transmission.urdf",
         help="Path to the URDF file.",
     )
     parser.add_argument(
         "--usd-output-dir",
-        default="/workspace/isaaclab/piper_isaac_sim/",
+        default="/workspace/isaaclab/scanbot/resources/piper_isaac_sim/",
         help="Directory to store the generated USD file.",
     )
     parser.add_argument(
