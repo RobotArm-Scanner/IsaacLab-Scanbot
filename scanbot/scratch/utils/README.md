@@ -57,6 +57,25 @@ python scanbot/scratch/utils/send_target_tcp.py \
   --pos-tol 0.005 --rot-tol 0.02 --timeout-sec 10
 ```
 
+## Show scanpoint as a red marker
+Use `relay_scanpoint_marker.py` to subscribe to a scanpoint topic and publish a
+red marker to `/scanbot/markers`.
+
+```bash
+conda activate scanbot-ros2
+cd /mnt/ext_sda1/dev/IsaacLab-ScanBot
+source scanbot/ros2/install/setup.bash
+python scanbot/scratch/utils/relay_scanpoint_marker.py \
+  --scanpoint-topic /scanbot/scanpoint \
+  --scanpoint-type pose \
+  --frame-id base
+```
+
+Notes:
+- Use `--scanpoint-type point` if the topic is `geometry_msgs/msg/PointStamped`.
+- Add `--once` to publish a single marker and exit.
+- `--frame-id` overrides the incoming message frame; omit it to use the header.
+
 ## Capture current TCP pose (demo slots)
 Inside the container (or any ROS2 environment that can see `/scanbot/tcp_pose`):
 ```bash

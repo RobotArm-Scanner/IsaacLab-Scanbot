@@ -8,6 +8,7 @@ TOPIC_PREFIX = "/scanbot"
 
 ACTION_NAME = f"{TOPIC_PREFIX}/target_tcp"
 TCP_POSE_TOPIC = f"{TOPIC_PREFIX}/tcp_pose"
+SCANPOINT_POSE_TOPIC = f"{TOPIC_PREFIX}/sp_pose"
 JOINT_STATE_TOPIC = f"{TOPIC_PREFIX}/joint_states"
 TELEPORT_TCP_ACTION = f"{TOPIC_PREFIX}/teleport_tcp"
 TELEPORT_JOINT_ACTION = f"{TOPIC_PREFIX}/teleport_joint"
@@ -37,6 +38,7 @@ POS_ONLY_GATE = 0.08
 TARGET_TCP_STABLE_STEPS = 5
 
 TCP_PUB_HZ = 10.0
+SCANPOINT_PUB_HZ = TCP_PUB_HZ
 JOINT_PUB_HZ = 10.0
 # Camera topics are high-bandwidth (RGB + depth). Keeping this modest avoids starving
 # other ROS2 traffic (e.g. teleport actions) when multiple cameras are enabled.

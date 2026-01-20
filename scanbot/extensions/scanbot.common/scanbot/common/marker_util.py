@@ -201,5 +201,5 @@ class WorldDirectionMarker:
             quat = quat.reshape(1, 4)
         axis = torch.tensor(forward_axis, dtype=torch.float32, device=self._device).view(1, 3)
         q_t = torch.tensor(quat, dtype=torch.float32, device=self._device)
-        dirs = math_utils.quat_rotate(q_t, axis.expand(q_t.shape[0], -1))
+        dirs = math_utils.quat_apply(q_t, axis.expand(q_t.shape[0], -1))
         self.render_points(pos, dirs, invert_direction=invert_direction, **kwargs)

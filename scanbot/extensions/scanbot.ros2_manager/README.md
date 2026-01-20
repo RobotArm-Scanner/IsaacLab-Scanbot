@@ -32,6 +32,10 @@ TCP pose:
 - `geometry_msgs/msg/PoseStamped` on `/scanbot/tcp_pose`
 - `header.frame_id`: always `"base"`
 
+Scanpoint pose:
+- `geometry_msgs/msg/PoseStamped` on `/scanbot/sp_pose`
+- `header.frame_id`: always `"base"`
+
 Joint state:
 - `sensor_msgs/msg/JointState` on `/scanbot/joint_states`
 - Published in simulator joint order.

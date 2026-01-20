@@ -12,7 +12,7 @@ from scanbot.scripts import scanbot_context
 
 from .camera_bridge import CameraBridge
 from .marker_bridge import MarkerBridge
-from .publishers import JointStatePublisher, TcpPosePublisher
+from .publishers import JointStatePublisher, ScanpointPosePublisher, TcpPosePublisher
 from .ros_env import Ros2Imports, ensure_ros2_available
 from .services import JointLimitsService, ResetEnvService
 from .target_tcp_action import TargetTcpAction
@@ -40,6 +40,7 @@ class Extension(omni.ext.IExt):
         self._target_tcp: TargetTcpAction | None = None
         self._teleport: TeleportActions | None = None
         self._tcp_pub: TcpPosePublisher | None = None
+        self._sp_pub: ScanpointPosePublisher | None = None
         self._joint_pub: JointStatePublisher | None = None
         self._reset_srv: ResetEnvService | None = None
         self._limits_srv: JointLimitsService | None = None
@@ -82,6 +83,7 @@ class Extension(omni.ext.IExt):
         self._target_tcp = TargetTcpAction(self._node, ros, math_utils)
         self._teleport = TeleportActions(self._node, ros, goal_active_fn=self._target_tcp.has_active_goal)
         self._tcp_pub = TcpPosePublisher(self._node, ros.PoseStamped)
+        self._sp_pub = ScanpointPosePublisher(self._node, ros.PoseStamped)
         self._joint_pub = JointStatePublisher(self._node, ros.JointState)
         self._reset_srv = ResetEnvService(self._node, ros, goal_active_fn=self._target_tcp.has_active_goal)
         self._limits_srv = JointLimitsService(self._node, ros)
@@ -141,6 +143,10 @@ class Extension(omni.ext.IExt):
         if self._tcp_pub is not None:
             self._tcp_pub.shutdown()
             self._tcp_pub = None
+
+        if self._sp_pub is not None:
+            self._sp_pub.shutdown()
+            self._sp_pub = None
 
         if self._joint_pub is not None:
             self._joint_pub.shutdown()
@@ -224,6 +230,9 @@ class Extension(omni.ext.IExt):
 
         if self._tcp_pub is not None and curr_pos is not None and curr_quat is not None:
             self._tcp_pub.maybe_publish(curr_pos, curr_quat, frame_id="base")
+
+        if self._sp_pub is not None and curr_pos is not None and curr_quat is not None:
+            self._sp_pub.maybe_publish(curr_pos, curr_quat)
 
         if self._joint_pub is not None:
             try:
