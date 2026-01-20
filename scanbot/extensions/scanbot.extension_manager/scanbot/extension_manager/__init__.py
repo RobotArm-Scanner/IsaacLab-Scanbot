@@ -33,9 +33,18 @@ class _RootChangeHandler(FileSystemEventHandler):
         self._mtimes_ns: dict[Path, int] = {}
 
     def on_any_event(self, event):  # type: ignore[override]
+        # Only reload on events that indicate a content/path change.
+        # Inotify can emit noisy "opened/closed/accessed" events which would otherwise trigger
+        # reload loops during startup (extensions being scanned) or normal reads.
+        event_type = getattr(event, "event_type", "")
+        if event_type not in {"modified", "created", "deleted", "moved"}:
+            return
         if getattr(event, "is_directory", False):
             return
-        path = Path(getattr(event, "src_path", ""))
+        if event_type == "moved":
+            path = Path(getattr(event, "dest_path", "") or getattr(event, "src_path", ""))
+        else:
+            path = Path(getattr(event, "src_path", ""))
         try:
             rel = path.relative_to(self._root)
         except ValueError:
