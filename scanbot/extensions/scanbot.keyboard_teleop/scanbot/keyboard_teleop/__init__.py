@@ -7,6 +7,7 @@ import omni.appwindow
 import omni.ext
 import omni.kit.app
 import torch
+from scanbot.core import activate_camera, create_camera
 from scanbot.scripts import scanbot_context
 
 
@@ -19,6 +20,7 @@ class Extension(omni.ext.IExt):
     _keyboard = None
     _kb_sub_id = None
     _pressed: set[str] = set()
+    _reset_requested = False
 
     def on_startup(self, ext_id: str) -> None:
         self._ext_id = ext_id
@@ -27,6 +29,7 @@ class Extension(omni.ext.IExt):
         self._keyboard = None
         self._kb_sub_id = None
         self._pressed: set[str] = set()
+        self._reset_requested = False
 
         app = omni.kit.app.get_app()
         stream = app.get_update_event_stream()
@@ -57,16 +60,39 @@ class Extension(omni.ext.IExt):
             key = name.upper() if isinstance(name, str) else ""
         if not key:
             return True
+        if key in {"ESCAPE", "SPACE"}:
+            if event.type == carb.input.KeyboardEventType.KEY_PRESS:
+                self._pressed.clear()
+            return True
+        if key == "R":
+            if event.type == carb.input.KeyboardEventType.KEY_PRESS:
+                self._reset_requested = True
+                self._pressed.clear()
+            return True
         if event.type in (carb.input.KeyboardEventType.KEY_PRESS, carb.input.KeyboardEventType.KEY_REPEAT):
             # print('PRESS')
             self._pressed.add(key)
         elif event.type == carb.input.KeyboardEventType.KEY_RELEASE:
             # print('RELEASE')
             self._pressed.discard(key)
+        return True
 
     def _on_update(self, e) -> None:
         env = scanbot_context.get_env()
         if env is None:
+            return
+        if self._reset_requested:
+            self._reset_requested = False
+            self._pressed.clear()
+            scanbot_context.clear_actions()
+            def _reset_hook() -> None:
+                env = scanbot_context.get_env()
+                scanbot_context.clear_actions()
+                env.sim.reset()
+                env.reset()
+
+            scanbot_context.enqueue_hook(_reset_hook)
+            self._reset_camera()
             return
 
         shape = (env.num_envs, env.action_manager.total_action_dim)
@@ -92,3 +118,7 @@ class Extension(omni.ext.IExt):
         action += delta
         scanbot_context.clear_actions()
         scanbot_context.enqueue_action(action)
+
+    def _reset_camera(self) -> None:
+        create_camera()
+        activate_camera()

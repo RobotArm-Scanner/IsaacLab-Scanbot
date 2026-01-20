@@ -8,6 +8,16 @@
 import argparse
 import time
 
+# NOTE:
+# Pinocchio (via hpp-fcl) can conflict with Kit's bundled assimp depending on
+# import order. Importing pinocchio before initializing AppLauncher can avoid
+# `libhpp-fcl.so: undefined symbol: Assimp::IOSystem::CurrentDirectory[...]`
+# in some setups (Isaac Sim 4.5+).
+try:
+    import pinocchio  # noqa: F401
+except Exception as exc:
+    print(f"[scanbot.basic_launcher] Pinocchio import skipped: {exc}")
+
 from isaaclab.app import AppLauncher
 
 # Basic CLI to load the existing scene and keep the loop empty.
@@ -54,19 +64,28 @@ def main() -> None:
     env_cfg.terminations.time_out = None
 
     env = gym.make(args_cli.task, cfg=env_cfg).unwrapped
+    env.sim.reset()
     env.reset()
     scanbot_context.set_env(env)
+    scanbot_context.clear_hook()
 
     zero_action = torch.zeros((env.num_envs, env.action_manager.total_action_dim), device=env.device)
 
     try:
         while simulation_app.is_running():
+            # Execute any queued hooks from extensions outside env.step() to avoid re-entrancy.
+            hook = scanbot_context.pop_hook()
+            while hook is not None:
+                try:
+                    hook()
+                except Exception as exc:
+                    print(f"[scanbot.basic_launcher] Hook failed: {exc}")
+                hook = scanbot_context.pop_hook()
+
             action = scanbot_context.pop_action()
-            if action is not None:
-                # print('env.step(', action, ')')
-                env.step(action)
-            else:
-                env.step(zero_action)
+            if action is None:
+                action = zero_action
+            env.step(action)
 
     finally:
         env.close()

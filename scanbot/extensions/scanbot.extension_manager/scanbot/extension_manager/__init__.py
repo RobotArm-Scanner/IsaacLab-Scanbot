@@ -29,6 +29,8 @@ class _RootChangeHandler(FileSystemEventHandler):
         self._root = extensions_root
         self._scanbot_exts = scanbot_exts
         self._signal_cb = signal_cb
+        # Guard against reload loops caused by access/attribute events (e.g. atime updates).
+        self._mtimes_ns: dict[Path, int] = {}
 
     def on_any_event(self, event):  # type: ignore[override]
         if getattr(event, "is_directory", False):
@@ -42,6 +44,19 @@ class _RootChangeHandler(FileSystemEventHandler):
             return
         ext_dir = rel.parts[0] if rel.parts else ""
         if ext_dir in self._scanbot_exts:
+            # Only trigger reload when file mtime actually changes.
+            try:
+                mtime_ns = path.stat().st_mtime_ns
+            except FileNotFoundError:
+                mtime_ns = -1
+            except Exception:
+                mtime_ns = -2
+
+            prev = self._mtimes_ns.get(path)
+            if prev is not None and prev == mtime_ns:
+                return
+            self._mtimes_ns[path] = mtime_ns
+
             print(f"[scanbot.extension_manager] FS event for {ext_dir}: {path}")
             self._signal_cb(ext_dir, str(path))
 
@@ -67,7 +82,8 @@ class Extension(omni.ext.IExt):
         # Locate extensions root and discover scanbot.* siblings.
         self_dir = Path(ext_utils.get_extension_path(ext_id))
         self._extensions_root = self_dir.parent
-        scanbot_exts = set(self._discover_scanbot_exts(exclude={ext_id}))
+        # ext_id can include version suffix; exclude by directory name to avoid self-reload loops.
+        scanbot_exts = set(self._discover_scanbot_exts(exclude={self_dir.name}))
         self._enable_exts(scanbot_exts)
 
         # Start watchdog on the root; route events to owning extension id.

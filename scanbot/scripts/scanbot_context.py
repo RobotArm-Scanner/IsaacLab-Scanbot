@@ -1,12 +1,12 @@
 """Shared Scanbot context for passing app/env between launcher and extensions."""
 
-from typing import Any, Optional, List
+from typing import Any, Callable, List, Optional
 
 _app_launcher: Any = None
 _env: Any = None
 # Simple FIFO for action tensors to be consumed by the launcher.
 _action_queue: List[Any] = []
-
+_hook_queue: List[Callable[[], None]] = []
 
 def set_app_launcher(app_launcher: Any) -> None:
     global _app_launcher
@@ -41,3 +41,24 @@ def pop_action() -> Optional[Any]:
 def clear_actions() -> None:
     """Clear all queued actions."""
     _action_queue.clear()
+
+
+def enqueue_hook(func: Callable[[], None]) -> None:
+    """Enqueue a hook to be executed by the launcher loop.
+
+    Hooks are executed in the launcher loop (outside of ``env.step()``) to avoid re-entrancy issues
+    if an extension triggers operations like ``env.reset()``.
+    """
+    _hook_queue.append(func)
+
+
+def pop_hook() -> Optional[Callable[[], None]]:
+    """Pop the oldest hook, if any."""
+    if not _hook_queue:
+        return None
+    return _hook_queue.pop(0)
+
+
+def clear_hook() -> None:
+    """Clear all queued hooks."""
+    _hook_queue.clear()
