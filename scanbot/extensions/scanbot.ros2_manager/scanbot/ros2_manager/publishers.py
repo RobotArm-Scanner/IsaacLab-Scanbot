@@ -1,0 +1,136 @@
+"""ROS2 topic publishers for scanbot.ros2_manager."""
+
+from __future__ import annotations
+
+import time
+
+import torch
+
+from . import config as _cfg
+
+TCP_POSE_TOPIC = _cfg.TCP_POSE_TOPIC
+TCP_PUB_HZ = _cfg.TCP_PUB_HZ
+JOINT_STATE_TOPIC = _cfg.JOINT_STATE_TOPIC
+JOINT_PUB_HZ = _cfg.JOINT_PUB_HZ
+
+
+class TcpPosePublisher:
+    def __init__(self, node, pose_stamped_type) -> None:
+        self._node = node
+        self._pose_stamped_type = pose_stamped_type
+        self._pub = None
+        self._next_pub = 0.0
+
+        if self._node is None or self._pose_stamped_type is None:
+            return
+        try:
+            self._pub = self._node.create_publisher(self._pose_stamped_type, TCP_POSE_TOPIC, 10)
+        except Exception:
+            self._pub = None
+
+    def shutdown(self) -> None:
+        if self._node is not None and self._pub is not None:
+            try:
+                self._node.destroy_publisher(self._pub)
+            except Exception:
+                pass
+        self._pub = None
+
+    def maybe_publish(self, curr_pos: torch.Tensor, curr_quat: torch.Tensor, frame_id: str = "base") -> None:
+        if self._node is None or self._pub is None:
+            return
+        if not self._pub_has_subscribers(self._pub):
+            return
+
+        now = time.monotonic()
+        if now < self._next_pub:
+            return
+        self._next_pub = now + (1.0 / max(TCP_PUB_HZ, 1.0))
+
+        try:
+            msg = self._pose_stamped_type()
+            msg.header.stamp = self._node.get_clock().now().to_msg()
+            msg.header.frame_id = frame_id
+            pos = curr_pos[0].detach().cpu().numpy().tolist()
+            quat = curr_quat[0].detach().cpu().numpy().tolist()
+            msg.pose.position.x = float(pos[0])
+            msg.pose.position.y = float(pos[1])
+            msg.pose.position.z = float(pos[2])
+            msg.pose.orientation.w = float(quat[0])
+            msg.pose.orientation.x = float(quat[1])
+            msg.pose.orientation.y = float(quat[2])
+            msg.pose.orientation.z = float(quat[3])
+            self._pub.publish(msg)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _pub_has_subscribers(pub) -> bool:
+        if pub is None:
+            return False
+        try:
+            return pub.get_subscription_count() > 0
+        except Exception:
+            return True
+
+
+class JointStatePublisher:
+    def __init__(self, node, joint_state_type) -> None:
+        self._node = node
+        self._joint_state_type = joint_state_type
+        self._pub = None
+        self._next_pub = 0.0
+
+        if self._node is None or self._joint_state_type is None:
+            return
+        try:
+            self._pub = self._node.create_publisher(self._joint_state_type, JOINT_STATE_TOPIC, 10)
+        except Exception:
+            self._pub = None
+
+    def shutdown(self) -> None:
+        if self._node is not None and self._pub is not None:
+            try:
+                self._node.destroy_publisher(self._pub)
+            except Exception:
+                pass
+        self._pub = None
+
+    def maybe_publish(self, robot) -> None:
+        if self._node is None or self._pub is None:
+            return
+        if not self._pub_has_subscribers(self._pub):
+            return
+
+        now = time.monotonic()
+        if now < self._next_pub:
+            return
+        self._next_pub = now + (1.0 / max(JOINT_PUB_HZ, 1.0))
+
+        try:
+            joint_names = list(getattr(robot, "joint_names", []))
+            pos = robot.data.joint_pos[0].detach().cpu().numpy().tolist()
+            vel = robot.data.joint_vel[0].detach().cpu().numpy().tolist()
+        except Exception:
+            return
+
+        try:
+            msg = self._joint_state_type()
+            msg.header.stamp = self._node.get_clock().now().to_msg()
+            msg.name = [str(n) for n in joint_names]
+            msg.position = [float(v) for v in pos]
+            msg.velocity = [float(v) for v in vel]
+            msg.effort = []
+            self._pub.publish(msg)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _pub_has_subscribers(pub) -> bool:
+        if pub is None:
+            return False
+        try:
+            return pub.get_subscription_count() > 0
+        except Exception:
+            return True
+

@@ -1,0 +1,19 @@
+[package]
+title = "Scanbot ROS2 Manager"
+description = "ROS 2 action bridge for commanding Scanbot TCP targets."
+version = "0.1.0"
+category = "robotics"
+authors = ["Scanbot"]
+
+[dependencies]
+"omni.kit.uiapp" = {}
+"omni.isaac.ros2_bridge" = {}
+
+[core]
+reloadable = true
+
+[[python.module]]
+name = "scanbot.ros2_manager"
+
+[scanbot]
+disabled = false
