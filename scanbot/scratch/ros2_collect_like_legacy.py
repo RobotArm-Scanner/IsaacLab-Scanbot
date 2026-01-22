@@ -68,6 +68,7 @@ def main() -> int:
     )
     parser.add_argument("--pcd_voxel", type=float, default=0.0005, help="Voxel size for per-frame PCD downsampling")
     parser.add_argument("--no_pcd", action="store_true", help="Skip PCD generation")
+    parser.add_argument("--no_reset", action="store_true", help="Skip /scanbot/reset_env before capture")
     args = parser.parse_args()
 
     legacy_dir = Path(args.legacy_dir).expanduser().resolve()
@@ -405,24 +406,25 @@ def main() -> int:
             return False
 
     rclpy.init()
-    # Reset before subscribing to high-bandwidth topics to avoid starving the service response.
-    reset_node = rclpy.create_node("scanbot_reset_client")
-    try:
-        reset_client = reset_node.create_client(Trigger, "/scanbot/reset_env")
-        start = time.monotonic()
-        while not reset_client.wait_for_service(timeout_sec=0.2):
-            if time.monotonic() - start > args.timeout_sec:
-                raise TimeoutError("Service not available: /scanbot/reset_env")
-        req = Trigger.Request()
-        fut = reset_client.call_async(req)
-        deadline = time.monotonic() + args.timeout_sec
-        while time.monotonic() < deadline and not fut.done():
-            rclpy.spin_once(reset_node, timeout_sec=0.1)
-        resp = fut.result() if fut.done() else None
-        if resp is None or not resp.success:
-            raise RuntimeError(f"reset_env failed: {resp.message if resp else 'timeout'}")
-    finally:
-        reset_node.destroy_node()
+    if not args.no_reset:
+        # Reset before subscribing to high-bandwidth topics to avoid starving the service response.
+        reset_node = rclpy.create_node("scanbot_reset_client")
+        try:
+            reset_client = reset_node.create_client(Trigger, "/scanbot/reset_env")
+            start = time.monotonic()
+            while not reset_client.wait_for_service(timeout_sec=0.2):
+                if time.monotonic() - start > args.timeout_sec:
+                    raise TimeoutError("Service not available: /scanbot/reset_env")
+            req = Trigger.Request()
+            fut = reset_client.call_async(req)
+            deadline = time.monotonic() + args.timeout_sec
+            while time.monotonic() < deadline and not fut.done():
+                rclpy.spin_once(reset_node, timeout_sec=0.1)
+            resp = fut.result() if fut.done() else None
+            if resp is None or not resp.success:
+                raise RuntimeError(f"reset_env failed: {resp.message if resp else 'timeout'}")
+        finally:
+            reset_node.destroy_node()
 
     node = Collector()
     try:

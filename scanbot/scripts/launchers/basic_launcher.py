@@ -6,7 +6,7 @@
 """Load the scanning scene objects and run an empty simulation loop."""
 
 import argparse
-import time
+import os
 
 # NOTE:
 # Pinocchio (via hpp-fcl) can conflict with Kit's bundled assimp depending on
@@ -65,27 +65,34 @@ def main() -> None:
 
     env = gym.make(args_cli.task, cfg=env_cfg).unwrapped
     env.sim.reset()
+    headless = bool(getattr(app_launcher, "_headless", False))
+    if not headless:
+        headless = str(os.getenv("HEADLESS", "0")).lower() in {"1", "true", "yes"}
+    if not headless:
+        headless = str(os.getenv("SCANBOT_HEADLESS", "0")).lower() in {"1", "true", "yes"}
+    if not simulation_app.is_running():
+        headless = True
+    if headless:
+        env.cfg.wait_for_textures = False
+        env.cfg.num_rerenders_on_reset = 0
     env.reset()
     scanbot_context.set_env(env)
-    scanbot_context.clear_hook()
 
     zero_action = torch.zeros((env.num_envs, env.action_manager.total_action_dim), device=env.device)
 
     try:
-        while simulation_app.is_running():
+        while True:
             # Execute any queued hooks from extensions outside env.step() to avoid re-entrancy.
             hook = scanbot_context.pop_hook()
             while hook is not None:
-                try:
-                    hook()
-                except Exception as exc:
-                    print(f"[scanbot.basic_launcher] Hook failed: {exc}")
+                hook()
                 hook = scanbot_context.pop_hook()
 
             action = scanbot_context.pop_action()
             if action is None:
                 action = zero_action
             env.step(action)
+            simulation_app.update()
 
     finally:
         env.close()

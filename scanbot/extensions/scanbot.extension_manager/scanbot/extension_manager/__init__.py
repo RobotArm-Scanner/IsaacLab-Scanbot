@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+import os
 from typing import List, Set
 
 import omni.ext
@@ -93,6 +94,14 @@ class Extension(omni.ext.IExt):
         self._extensions_root = self_dir.parent
         # ext_id can include version suffix; exclude by directory name to avoid self-reload loops.
         scanbot_exts = set(self._discover_scanbot_exts(exclude={self_dir.name}))
+        # Skip UI/keyboard extensions in headless runs to avoid windowing issues.
+        headless_env = os.environ.get("HEADLESS", "0")
+        disable_ui_env = os.environ.get("SCANBOT_DISABLE_UI_EXTENSIONS", "")
+        headless = headless_env in {"1", "true", "TRUE", "yes", "YES"}
+        disable_ui = disable_ui_env in {"1", "true", "TRUE", "yes", "YES"}
+        if headless or disable_ui:
+            # Skip viewport/camera window wiring in headless mode.
+            scanbot_exts.discard("scanbot.core")
         self._enable_exts(scanbot_exts)
 
         # Start watchdog on the root; route events to owning extension id.

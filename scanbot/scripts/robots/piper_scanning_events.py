@@ -43,6 +43,19 @@ def randomize_joint_by_gaussian_offset(
 ):
     asset: Articulation = env.scene[asset_cfg.name]
 
+    # Ensure env_ids and default tensors are on the same device for indexing.
+    target_device = asset.device
+    if not isinstance(env_ids, torch.Tensor):
+        env_ids = torch.tensor(env_ids, device=target_device, dtype=torch.long)
+    else:
+        env_ids = env_ids.to(device=target_device, dtype=torch.long)
+    if asset.data.default_joint_pos.device != target_device:
+        asset.data.default_joint_pos = asset.data.default_joint_pos.to(target_device)
+    if asset.data.default_joint_vel.device != target_device:
+        asset.data.default_joint_vel = asset.data.default_joint_vel.to(target_device)
+    if asset.data.soft_joint_pos_limits.device != target_device:
+        asset.data.soft_joint_pos_limits = asset.data.soft_joint_pos_limits.to(target_device)
+
     # Add gaussian noise to joint states
     joint_pos = asset.data.default_joint_pos[env_ids].clone()
     joint_vel = asset.data.default_joint_vel[env_ids].clone()

@@ -351,7 +351,10 @@ class CameraBridge:
         self._default_pose_pub = None
         self._default_pcd_pub = None
 
-        sensors = getattr(env.scene, "sensors", None)
+        scene = getattr(env, "scene", None)
+        if scene is None:
+            return
+        sensors = getattr(scene, "sensors", None)
         if sensors is None:
             self._cameras_ready = True
             return
