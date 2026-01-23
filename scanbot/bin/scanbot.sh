@@ -32,7 +32,6 @@ esac
 case "${HEADLESS_FLAG}" in
   1|true|TRUE|yes|YES)
     export HEADLESS=1
-    export ISAACLAB_SKIP_INIT_STAGE_RENDER="${SCANBOT_SKIP_INIT_STAGE_RENDER:-1}"
     if [ "${SCANBOT_HEADLESS_KEEP_DISPLAY:-1}" = "1" ]; then
       export DISPLAY="${SCANBOT_DISPLAY:-:3}"
     else
@@ -46,7 +45,6 @@ esac
 MULTI_GPU_ENABLED="${SCANBOT_MULTIGPU_ENABLED:-true}"
 MULTI_GPU_AUTO="${SCANBOT_MULTIGPU_AUTO:-true}"
 MULTI_GPU_MAX="${SCANBOT_MULTIGPU_MAX:-8}"
-GLINTEROP_ENABLED="${SCANBOT_GLINTEROP_ENABLED:-false}"
 FORCE_WINDOW="${FORCE_WINDOW:-${SCANBOT_FORCE_WINDOW:-0}}"
 WINDOW_ARGS=""
 case "${FORCE_WINDOW}" in
@@ -68,7 +66,7 @@ fi
 if [ -n "${PHYSX_GPU}" ]; then
   PHYSX_GPU_ARG="--/physics/cudaDevice=${PHYSX_GPU}"
 fi
-KIT_ARGS="--/renderer/multiGpu/enabled=${MULTI_GPU_ENABLED} --/renderer/multiGpu/autoEnable=${MULTI_GPU_AUTO} --/renderer/multiGpu/maxGpuCount=${MULTI_GPU_MAX} ${ACTIVE_GPU_ARG} ${PHYSX_GPU_ARG} --/renderer/gpuEnumeration/glInterop/enabled=${GLINTEROP_ENABLED} --/app/renderer/waitIdle=false --/app/hydraEngine/waitIdle=false --/app/updateOrder/checkForHydraRenderComplete=0 ${LIVESTREAM_PORT_ARG} ${WINDOW_ARGS} --enable omni.usd.metrics.assembler"
+KIT_ARGS="--/renderer/multiGpu/enabled=${MULTI_GPU_ENABLED} --/renderer/multiGpu/autoEnable=${MULTI_GPU_AUTO} --/renderer/multiGpu/maxGpuCount=${MULTI_GPU_MAX} ${ACTIVE_GPU_ARG} ${PHYSX_GPU_ARG} --/app/renderer/waitIdle=false --/app/hydraEngine/waitIdle=false --/app/updateOrder/checkForHydraRenderComplete=0 ${LIVESTREAM_PORT_ARG} ${WINDOW_ARGS} --enable omni.usd.metrics.assembler"
 ENABLE_CAMERAS_FLAG="${SCANBOT_ENABLE_CAMERAS:-1}"
 ENABLE_CAMERAS_ARG="--enable_cameras"
 case "${ENABLE_CAMERAS_FLAG}" in
