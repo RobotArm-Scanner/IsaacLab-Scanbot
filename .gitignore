@@ -64,6 +64,11 @@ _build
 # Teleop Recorded Dataset
 /datasets/
 
+# Scanbot local artifacts
+/scanbot/scratch/
+/scanbot/ros2/install/
+/scanbot/ros2/log/
+
 # Tests
 tests/
 
