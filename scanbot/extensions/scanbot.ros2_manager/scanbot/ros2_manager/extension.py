@@ -10,6 +10,7 @@ import omni.ext
 import omni.kit.app
 
 from scanbot.scripts import scanbot_context
+from scanbot.common import pos_util
 
 from .camera_bridge import CameraBridge
 from .marker_bridge import MarkerBridge
@@ -255,6 +256,10 @@ class Extension(omni.ext.IExt):
             if self._teleport is not None:
                 self._teleport.maybe_timeout_when_env_missing()
             return
+        try:
+            pos_util.configure_from_env(env)
+        except Exception:
+            pass
 
         action_term = None
         curr_pos = None

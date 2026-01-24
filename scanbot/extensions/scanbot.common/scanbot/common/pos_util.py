@@ -120,33 +120,171 @@ def _quat_wxyz_from_deg_z_y_x(deg_xyz) -> np.ndarray:
     return quat_mul_wxyz(quat_mul_wxyz(qz, qy), qx)
 
 
-# Fixed Scanbot offsets from legacy collect3d (compute_camera_pose_from_tcp_base).
-_BODY_OFFSET_POS = np.array((0.0, 0.0, 0.107), dtype=float)
-_BODY_OFFSET_QUAT_WXYZ = np.array((1.0, 0.0, 0.0, 0.0), dtype=float)
-_MOUNT_OFFSET_POS = np.array((0.0, 0.0, 0.003), dtype=float)
-_MOUNT_OFFSET_QUAT_WXYZ = _quat_wxyz_from_deg_z_y_x((180.0, 0.0, 90.0))
-_CAMERA_OFFSET_POS = np.array((-0.00171854, -0.00751282, -0.26088225), dtype=float)
-_CAMERA_OFFSET_QUAT_WXYZ = _quat_wxyz_from_deg_z_y_x((90.0, 0.0, 0.0))
+# Offsets are configured at runtime from the active environment.
+_BODY_OFFSET_POS: np.ndarray | None = None
+_BODY_OFFSET_QUAT_WXYZ: np.ndarray | None = None
+_MOUNT_OFFSET_POS: np.ndarray | None = None
+_MOUNT_OFFSET_QUAT_WXYZ: np.ndarray | None = None
+_CAMERA_OFFSET_POS: np.ndarray | None = None
+_CAMERA_OFFSET_QUAT_WXYZ: np.ndarray | None = None
 
-_BODY_INV_POS, _BODY_INV_QUAT_WXYZ = _invert_offset(_BODY_OFFSET_POS, _BODY_OFFSET_QUAT_WXYZ)
-_TCP_TO_SCANPOINT_POS, _TCP_TO_SCANPOINT_QUAT_WXYZ = _compose_offsets(
-    _BODY_INV_POS,
-    _BODY_INV_QUAT_WXYZ,
-    _MOUNT_OFFSET_POS,
-    _MOUNT_OFFSET_QUAT_WXYZ,
-)
-_TCP_TO_SCANPOINT_POS, _TCP_TO_SCANPOINT_QUAT_WXYZ = _compose_offsets(
-    _TCP_TO_SCANPOINT_POS,
-    _TCP_TO_SCANPOINT_QUAT_WXYZ,
-    _CAMERA_OFFSET_POS,
-    _CAMERA_OFFSET_QUAT_WXYZ,
-)
+_TCP_TO_SCANPOINT_POS: np.ndarray | None = None
+_TCP_TO_SCANPOINT_QUAT_WXYZ: np.ndarray | None = None
+_SCANPOINT_TO_TCP_POS: np.ndarray | None = None
+_SCANPOINT_TO_TCP_QUAT_WXYZ: np.ndarray | None = None
+
+_CONFIGURED = False
+_CONFIGURED_ENV_ID: int | None = None
 # OpenGL -> ROS camera convention: 180 deg around X axis.
 _CAMERA_ROS_CORRECTION_WXYZ = np.array((0.0, 1.0, 0.0, 0.0), dtype=float)
-_SCANPOINT_TO_TCP_POS, _SCANPOINT_TO_TCP_QUAT_WXYZ = _invert_offset(
-    _TCP_TO_SCANPOINT_POS,
-    _TCP_TO_SCANPOINT_QUAT_WXYZ,
-)
+
+
+def _require_configured() -> None:
+    if not _CONFIGURED:
+        raise RuntimeError("Scanbot offsets not configured. Call configure_from_env(env) first.")
+
+
+def _set_offsets(
+    body_pos,
+    body_quat_wxyz,
+    mount_pos,
+    mount_quat_wxyz,
+    camera_pos,
+    camera_quat_wxyz,
+) -> None:
+    global _BODY_OFFSET_POS
+    global _BODY_OFFSET_QUAT_WXYZ
+    global _MOUNT_OFFSET_POS
+    global _MOUNT_OFFSET_QUAT_WXYZ
+    global _CAMERA_OFFSET_POS
+    global _CAMERA_OFFSET_QUAT_WXYZ
+    global _TCP_TO_SCANPOINT_POS
+    global _TCP_TO_SCANPOINT_QUAT_WXYZ
+    global _SCANPOINT_TO_TCP_POS
+    global _SCANPOINT_TO_TCP_QUAT_WXYZ
+
+    _BODY_OFFSET_POS = _to_numpy(body_pos, shape=(3,))
+    _BODY_OFFSET_QUAT_WXYZ = _normalize_quat_wxyz(body_quat_wxyz)
+    _MOUNT_OFFSET_POS = _to_numpy(mount_pos, shape=(3,))
+    _MOUNT_OFFSET_QUAT_WXYZ = _normalize_quat_wxyz(mount_quat_wxyz)
+    _CAMERA_OFFSET_POS = _to_numpy(camera_pos, shape=(3,))
+    _CAMERA_OFFSET_QUAT_WXYZ = _normalize_quat_wxyz(camera_quat_wxyz)
+
+    body_inv_pos, body_inv_quat = _invert_offset(_BODY_OFFSET_POS, _BODY_OFFSET_QUAT_WXYZ)
+    tcp_to_scan_pos, tcp_to_scan_quat = _compose_offsets(
+        body_inv_pos,
+        body_inv_quat,
+        _MOUNT_OFFSET_POS,
+        _MOUNT_OFFSET_QUAT_WXYZ,
+    )
+    tcp_to_scan_pos, tcp_to_scan_quat = _compose_offsets(
+        tcp_to_scan_pos,
+        tcp_to_scan_quat,
+        _CAMERA_OFFSET_POS,
+        _CAMERA_OFFSET_QUAT_WXYZ,
+    )
+    _TCP_TO_SCANPOINT_POS = tcp_to_scan_pos
+    _TCP_TO_SCANPOINT_QUAT_WXYZ = tcp_to_scan_quat
+    _SCANPOINT_TO_TCP_POS, _SCANPOINT_TO_TCP_QUAT_WXYZ = _invert_offset(
+        _TCP_TO_SCANPOINT_POS,
+        _TCP_TO_SCANPOINT_QUAT_WXYZ,
+    )
+
+
+def configure_from_env(env, *, force: bool = False) -> bool:
+    """Configure Scanbot offsets from the live Isaac Lab environment."""
+    global _CONFIGURED
+    global _CONFIGURED_ENV_ID
+
+    if env is None:
+        return False
+
+    env_id = id(env)
+    if _CONFIGURED and _CONFIGURED_ENV_ID == env_id and not force:
+        return True
+
+    try:
+        import isaaclab.sim as sim_utils  # runtime only
+    except Exception as exc:
+        raise RuntimeError("isaaclab.sim unavailable; cannot resolve offsets.") from exc
+
+    cfg = getattr(env, "cfg", None)
+    action_term = None
+    try:
+        action_term = env.action_manager.get_term("arm_action")
+    except Exception:
+        action_term = None
+
+    body_offset = None
+    body_name = None
+    if action_term is not None:
+        body_name = getattr(getattr(action_term, "cfg", None), "body_name", None)
+        body_offset = getattr(getattr(action_term, "cfg", None), "body_offset", None)
+    if body_offset is None and cfg is not None:
+        body_name = body_name or getattr(getattr(getattr(cfg, "actions", None), "arm_action", None), "body_name", None)
+        body_offset = getattr(getattr(getattr(cfg, "actions", None), "arm_action", None), "body_offset", None)
+
+    if body_offset is None:
+        raise RuntimeError("arm_action body_offset is missing; cannot configure TCP offset.")
+
+    body_pos = getattr(body_offset, "pos", None)
+    body_quat = getattr(body_offset, "rot", None)
+    if body_pos is None or body_quat is None:
+        raise RuntimeError("arm_action body_offset is incomplete.")
+
+    scene_cfg = getattr(cfg, "scene", None) if cfg is not None else None
+    robot_cfg = getattr(scene_cfg, "robot", None) if scene_cfg is not None else None
+    robot_path = getattr(robot_cfg, "prim_path", None) if robot_cfg is not None else None
+    if robot_path is None or body_name is None:
+        raise RuntimeError("Robot prim path/body name unavailable; cannot resolve mount/camera offsets.")
+    link6_path = f"{robot_path}/{body_name}"
+
+    tool_path = getattr(getattr(scene_cfg, "tool", None), "prim_path", None)
+    camera_path = getattr(getattr(scene_cfg, "wrist_camera", None), "prim_path", None)
+    if camera_path is None:
+        raise RuntimeError("wrist_camera prim path missing; cannot resolve camera offset.")
+
+    def _first_prim(path: str):
+        prims = sim_utils.find_matching_prims(path)
+        if not prims:
+            raise RuntimeError(f"Prim not found for path: {path}")
+        return prims[0]
+
+    link6_prim = _first_prim(link6_path)
+    tool_prim = _first_prim(tool_path) if tool_path is not None else None
+    camera_prim = _first_prim(camera_path)
+
+    if tool_prim is not None:
+        mount_pos, mount_quat = sim_utils.resolve_prim_pose(tool_prim, ref_prim=link6_prim)
+        camera_pos, camera_quat = sim_utils.resolve_prim_pose(camera_prim, ref_prim=tool_prim)
+    else:
+        mount_pos, mount_quat = (0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0)
+        camera_pos, camera_quat = sim_utils.resolve_prim_pose(camera_prim, ref_prim=link6_prim)
+
+    _set_offsets(body_pos, body_quat, mount_pos, mount_quat, camera_pos, camera_quat)
+    _CONFIGURED = True
+    _CONFIGURED_ENV_ID = env_id
+    return True
+
+
+def get_body_offset() -> tuple[np.ndarray, np.ndarray]:
+    _require_configured()
+    return _BODY_OFFSET_POS.copy(), _BODY_OFFSET_QUAT_WXYZ.copy()  # type: ignore[union-attr]
+
+
+def get_mount_offset() -> tuple[np.ndarray, np.ndarray]:
+    _require_configured()
+    return _MOUNT_OFFSET_POS.copy(), _MOUNT_OFFSET_QUAT_WXYZ.copy()  # type: ignore[union-attr]
+
+
+def get_camera_offset() -> tuple[np.ndarray, np.ndarray]:
+    _require_configured()
+    return _CAMERA_OFFSET_POS.copy(), _CAMERA_OFFSET_QUAT_WXYZ.copy()  # type: ignore[union-attr]
+
+
+def get_tcp_to_scanpoint_offset() -> tuple[np.ndarray, np.ndarray]:
+    _require_configured()
+    return _TCP_TO_SCANPOINT_POS.copy(), _TCP_TO_SCANPOINT_QUAT_WXYZ.copy()  # type: ignore[union-attr]
 
 
 def base_to_world_point(pos_base, root_pos_w, root_rot_mat) -> np.ndarray:
@@ -203,9 +341,15 @@ def tcp_to_scanpoint(
     - TCP includes the DIK body offset (link6 -> TCP).
     - Scanpoint is the wrist camera pose under link6 (mount + camera offsets).
     """
+    _require_configured()
     tcp_pos = _to_numpy(tcp_pos_base, shape=(3,))
     tcp_q = _normalize_quat_wxyz(tcp_quat_wxyz)
-    scan_pos, scan_q = _apply_offset(tcp_pos, tcp_q, _TCP_TO_SCANPOINT_POS, _TCP_TO_SCANPOINT_QUAT_WXYZ)
+    scan_pos, scan_q = _apply_offset(
+        tcp_pos,
+        tcp_q,
+        _TCP_TO_SCANPOINT_POS,
+        _TCP_TO_SCANPOINT_QUAT_WXYZ,
+    )
     scan_q = quat_mul_wxyz(_CAMERA_ROS_CORRECTION_WXYZ, scan_q)
     return scan_pos, scan_q
 
@@ -218,6 +362,7 @@ def scanpoint_to_tcp(
 
     Inverts the fixed Scanbot scanpoint transform (wrist camera -> TCP).
     """
+    _require_configured()
     scan_pos = _to_numpy(scan_pos_base, shape=(3,))
     scan_q = _normalize_quat_wxyz(scan_quat_wxyz)
     scan_q = quat_mul_wxyz(_CAMERA_ROS_CORRECTION_WXYZ, scan_q)

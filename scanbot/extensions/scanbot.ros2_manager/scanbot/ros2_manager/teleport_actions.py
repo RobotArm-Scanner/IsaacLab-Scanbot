@@ -21,8 +21,6 @@ from . import config as _cfg
 TELEPORT_JOINT_ACTION = _cfg.TELEPORT_JOINT_ACTION
 TELEPORT_TCP_ACTION = _cfg.TELEPORT_TCP_ACTION
 PIPER_URDF_PATH = _cfg.PIPER_URDF_PATH
-TCP_BODY_OFFSET_POS = _cfg.TCP_BODY_OFFSET_POS
-TCP_BODY_OFFSET_QUAT_WXYZ = _cfg.TCP_BODY_OFFSET_QUAT_WXYZ
 
 
 _BASE_FRAMES = {"", "base", "base_link", "robot_base"}
@@ -554,10 +552,19 @@ class TeleportActions:
         quat_xyzw = np.roll(quat_wxyz, -1)
         base_to_tcp = self._pinocchio.SE3(self._pinocchio.Quaternion(quat_xyzw), pos_b)
 
-        body_offset_quat_xyzw = np.roll(np.array(TCP_BODY_OFFSET_QUAT_WXYZ, dtype=float), -1)
+        try:
+            body_offset_pos, body_offset_quat = pos_util.get_body_offset()
+        except Exception as exc:
+            if self._node is not None:
+                try:
+                    self._node.get_logger().warn(f"TCP body offset unavailable: {exc}")
+                except Exception:
+                    pass
+            raise
+        body_offset_quat_xyzw = np.roll(np.array(body_offset_quat, dtype=float), -1)
         body_offset_se3 = self._pinocchio.SE3(
             self._pinocchio.Quaternion(body_offset_quat_xyzw),
-            np.array(TCP_BODY_OFFSET_POS, dtype=float),
+            np.array(body_offset_pos, dtype=float),
         )
         return base_to_tcp * body_offset_se3.inverse()
 

@@ -59,6 +59,3 @@ PIPER_URDF_PATH = os.path.join(
     "urdf",
     "piper_no_gripper_description.urdf",
 )
-# TCP body offset used by DIK controller (link6 -> TCP).
-TCP_BODY_OFFSET_POS = (0.0, 0.0, 0.107)
-TCP_BODY_OFFSET_QUAT_WXYZ = (1.0, 0.0, 0.0, 0.0)

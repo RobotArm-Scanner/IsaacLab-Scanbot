@@ -74,6 +74,7 @@ case "${ENABLE_CAMERAS_FLAG}" in
     ENABLE_CAMERAS_ARG=""
     ;;
 esac
+NUM_ENVS="${SCANBOT_NUM_ENVS:-1}"
 
 script -q -f -e -a \
   /workspace/isaaclab/scanbot/logs/isaaclab.log \
@@ -82,6 +83,6 @@ script -q -f -e -a \
       ./isaaclab.sh -p scanbot/scripts/launchers/basic_launcher.py \
         --ext-folder scanbot/extensions \
         ${ENABLE_CAMERAS_ARG} \
-        --num_envs 1 \
+        --num_envs ${NUM_ENVS} \
         ${DEVICE_ARG} \
         --kit_args \"${KIT_ARGS}\"'"
