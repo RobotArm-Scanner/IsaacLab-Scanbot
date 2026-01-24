@@ -1,3 +1,13 @@
+if [ -f /opt/ros/humble/setup.bash ]; then
+  # Ensure ROS 2 runtime libs are on the env before launching Isaac Sim.
+  source /opt/ros/humble/setup.bash
+fi
+if [ -f /opt/scanbot_ros2/setup.bash ]; then
+  source /opt/scanbot_ros2/setup.bash
+elif [ -f /workspace/isaaclab/scanbot/ros2/install/setup.bash ]; then
+  source /workspace/isaaclab/scanbot/ros2/install/setup.bash
+fi
+
 MULTI_GPU_ENABLED="${SCANBOT_MULTIGPU_ENABLED:-true}"
 MULTI_GPU_AUTO="${SCANBOT_MULTIGPU_AUTO:-true}"
 MULTI_GPU_MAX="${SCANBOT_MULTIGPU_MAX:-8}"
