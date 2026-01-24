@@ -11,6 +11,9 @@ fi
 
 WS_ROOT="/workspace/isaaclab/scanbot/ros2"
 PKG_DIR="${WS_ROOT}/scanbot_msgs"
+INSTALL_ROOT="/opt/scanbot_ros2"
+BUILD_ROOT="/tmp/scanbot_ros2_build"
+LOG_ROOT="/tmp/scanbot_ros2_log"
 
 if [ ! -d "${PKG_DIR}" ]; then
   echo "[ERROR] scanbot_msgs not found at ${PKG_DIR}" >&2
@@ -34,12 +37,18 @@ set -u
 # Force CMake to use system Python 3.10 (ROS 2 runtime)
 export Python3_EXECUTABLE=/usr/bin/python3
 export PYTHON_EXECUTABLE=/usr/bin/python3
+rm -rf "${BUILD_ROOT}" "${LOG_ROOT}" "${INSTALL_ROOT}"
+mkdir -p "${BUILD_ROOT}" "${LOG_ROOT}" "${INSTALL_ROOT}"
 cd "${WS_ROOT}"
-rm -rf build/scanbot_msgs install/scanbot_msgs log
-colcon build --packages-select scanbot_msgs --cmake-args \
+colcon build \
+  --packages-select scanbot_msgs \
+  --build-base "${BUILD_ROOT}" \
+  --install-base "${INSTALL_ROOT}" \
+  --log-base "${LOG_ROOT}" \
+  --cmake-args \
   -DPython3_EXECUTABLE=/usr/bin/python3 \
   -DPYTHON_EXECUTABLE=/usr/bin/python3
 
 echo "[INFO] Build complete. Source these before running Isaac Sim:"
 echo "  source /opt/ros/humble/setup.bash"
-echo "  source /workspace/isaaclab/scanbot/ros2/install/setup.bash"
+echo "  source /opt/scanbot_ros2/setup.bash"

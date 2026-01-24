@@ -140,9 +140,16 @@ def _bootstrap_ros2_env() -> None:
         return
 
     setup_scripts: list[str] = []
+    install_roots: list[Path] = []
     ros_setup = "/opt/ros/humble/setup.bash"
     if os.path.isfile(ros_setup):
         setup_scripts.append(ros_setup)
+
+    opt_install = Path("/opt/scanbot_ros2")
+    opt_setup = opt_install / "setup.bash"
+    if opt_setup.is_file():
+        setup_scripts.append(str(opt_setup))
+        install_roots.append(opt_install)
 
     # Try workspace location relative to this extension path.
     ext_path = Path(__file__).resolve()
@@ -150,6 +157,7 @@ def _bootstrap_ros2_env() -> None:
         ws_setup = parent / "scanbot" / "ros2" / "install" / "setup.bash"
         if ws_setup.is_file():
             setup_scripts.append(str(ws_setup))
+            install_roots.append(ws_setup.parent)
             break
 
     # Try common workspace locations for scanbot_msgs install.
@@ -158,6 +166,7 @@ def _bootstrap_ros2_env() -> None:
         ws_setup = Path(root) / "scanbot" / "ros2" / "install" / "setup.bash"
         if ws_setup.is_file():
             setup_scripts.append(str(ws_setup))
+            install_roots.append(ws_setup.parent)
             break
 
     if not setup_scripts:
@@ -202,8 +211,7 @@ def _bootstrap_ros2_env() -> None:
                 del sys.modules[name]
 
     # Ensure scanbot_msgs libs and python packages are reachable even if hooks are incomplete.
-    for root in candidate_roots:
-        install_root = Path(root) / "scanbot" / "ros2" / "install"
+    for install_root in install_roots:
         pkg_root = install_root / "scanbot_msgs"
         if pkg_root.is_dir():
             lib_dir = pkg_root / "lib"

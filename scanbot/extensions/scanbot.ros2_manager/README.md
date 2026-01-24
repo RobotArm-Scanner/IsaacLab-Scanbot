@@ -100,10 +100,9 @@ Query joint position limits from the simulator.
 
 ## Example (ROS 2)
 ```bash
-# Build and source the interface package
-cd scanbot/ros2
-colcon build --packages-select scanbot_msgs
-source install/setup.bash
+# Build and source the interface package (container default install path)
+/usr/local/bin/setup_scanbot_msgs.sh
+source /opt/scanbot_ros2/setup.bash
 
 # Send an action goal
 ros2 action send_goal /scanbot/target_tcp scanbot_msgs/action/TargetTcp "{target: {header: {frame_id: 'base'}, pose: {position: {x: 0.4, y: 0.0, z: 0.2}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}, pos_tolerance: 0.005, rot_tolerance: 0.02, timeout_sec: 10.0}"
