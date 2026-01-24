@@ -76,9 +76,9 @@ x-default-isaac-lab-volumes: &default-isaac-lab-volumes
   - type: bind
     source: ../scanbot
     target: ${DOCKER_ISAACLAB_PATH}/scanbot
-  - type: bind
-    source: /mnt/scanbot
-    target: /mnt/scanbot
+  # - type: bind
+  #   source: /mnt/scanbot
+  #   target: /mnt/scanbot
   - type: bind
     source: ../.git
     target: ${DOCKER_ISAACLAB_PATH}/.git
