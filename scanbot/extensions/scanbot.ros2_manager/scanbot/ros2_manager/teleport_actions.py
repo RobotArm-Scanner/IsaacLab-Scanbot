@@ -80,41 +80,25 @@ class TeleportActions:
 
         cb_group = self._ros.ReentrantCallbackGroup()
 
-        if self._ros.TeleportTcpAction is not None:
-            try:
-                self._teleport_tcp_action = self._ros.ActionServer(
-                    self._node,
-                    self._ros.TeleportTcpAction,
-                    TELEPORT_TCP_ACTION,
-                    execute_callback=self._execute_tcp,
-                    goal_callback=self._goal_tcp,
-                    cancel_callback=self._cancel,
-                    callback_group=cb_group,
-                )
-            except Exception as exc:
-                self._teleport_tcp_action = None
-                try:
-                    self._node.get_logger().warn(f"Failed to create teleport_tcp action: {exc}")
-                except Exception:
-                    pass
+        self._teleport_tcp_action = self._ros.ActionServer(
+            self._node,
+            self._ros.TeleportTcpAction,
+            TELEPORT_TCP_ACTION,
+            execute_callback=self._execute_tcp,
+            goal_callback=self._goal_tcp,
+            cancel_callback=self._cancel,
+            callback_group=cb_group,
+        )
 
-        if self._ros.TeleportJointsAction is not None:
-            try:
-                self._teleport_joint_action = self._ros.ActionServer(
-                    self._node,
-                    self._ros.TeleportJointsAction,
-                    TELEPORT_JOINT_ACTION,
-                    execute_callback=self._execute_joint,
-                    goal_callback=self._goal_joint,
-                    cancel_callback=self._cancel,
-                    callback_group=cb_group,
-                )
-            except Exception as exc:
-                self._teleport_joint_action = None
-                try:
-                    self._node.get_logger().warn(f"Failed to create teleport_joint action: {exc}")
-                except Exception:
-                    pass
+        self._teleport_joint_action = self._ros.ActionServer(
+            self._node,
+            self._ros.TeleportJointsAction,
+            TELEPORT_JOINT_ACTION,
+            execute_callback=self._execute_joint,
+            goal_callback=self._goal_joint,
+            cancel_callback=self._cancel,
+            callback_group=cb_group,
+        )
 
     def shutdown(self) -> None:
         with self._goal_lock:
@@ -124,16 +108,8 @@ class TeleportActions:
             goal_state.status = "aborted"
             goal_state.message = "TeleportActions shutdown"
             goal_state.done_event.set()
-        if self._teleport_tcp_action is not None:
-            try:
-                self._teleport_tcp_action.destroy()
-            except Exception:
-                pass
-        if self._teleport_joint_action is not None:
-            try:
-                self._teleport_joint_action.destroy()
-            except Exception:
-                pass
+        self._teleport_tcp_action.destroy()
+        self._teleport_joint_action.destroy()
         self._teleport_tcp_action = None
         self._teleport_joint_action = None
 
@@ -198,10 +174,10 @@ class TeleportActions:
             goal_handle.abort()
             return result
 
-        names = list(getattr(goal_request, "name", []))
-        positions = [float(x) for x in list(getattr(goal_request, "position", []))]
-        tol = float(getattr(goal_request, "tolerance", 0.0) or 0.0)
-        timeout = float(getattr(goal_request, "timeout_sec", 0.0) or 0.0)
+        names = list(goal_request.name)
+        positions = [float(x) for x in list(goal_request.position)]
+        tol = float(goal_request.tolerance or 0.0)
+        timeout = float(goal_request.timeout_sec or 0.0)
 
         goal_state = _GoalState(
             goal_handle=goal_handle,
@@ -254,8 +230,7 @@ class TeleportActions:
             return result
 
         target = goal_request.target
-        frame_id = getattr(getattr(target, "header", None), "frame_id", "") or ""
-        frame_id = frame_id.strip() or "base"
+        frame_id = target.header.frame_id.strip() or "base"
         pos = np.array([target.pose.position.x, target.pose.position.y, target.pose.position.z], dtype=float)
         quat_wxyz = np.array(
             [
@@ -268,9 +243,9 @@ class TeleportActions:
         )
         quat_wxyz = self._normalize_quat_wxyz(quat_wxyz)
 
-        pos_tol = float(getattr(goal_request, "pos_tolerance", 0.0) or 0.0)
-        rot_tol = float(getattr(goal_request, "rot_tolerance", 0.0) or 0.0)
-        timeout = float(getattr(goal_request, "timeout_sec", 0.0) or 0.0)
+        pos_tol = float(goal_request.pos_tolerance or 0.0)
+        rot_tol = float(goal_request.rot_tolerance or 0.0)
+        timeout = float(goal_request.timeout_sec or 0.0)
 
         goal_state = _GoalState(
             goal_handle=goal_handle,
@@ -340,28 +315,22 @@ class TeleportActions:
         goal_state.done_event.set()
 
     def _publish_joint_feedback(self, goal_state: _GoalState) -> None:
-        try:
-            fb = self._ros.TeleportJointsAction.Feedback()
-            fb.max_abs_error = float(goal_state.joint_max_abs_error)
-            fb.elapsed_sec = float(time.monotonic() - goal_state.start_time)
-            goal_state.goal_handle.publish_feedback(fb)
-        except Exception:
-            pass
+        fb = self._ros.TeleportJointsAction.Feedback()
+        fb.max_abs_error = float(goal_state.joint_max_abs_error)
+        fb.elapsed_sec = float(time.monotonic() - goal_state.start_time)
+        goal_state.goal_handle.publish_feedback(fb)
 
     def _publish_tcp_feedback(self, goal_state: _GoalState) -> None:
-        try:
-            fb = self._ros.TeleportTcpAction.Feedback()
-            fb.pos_error = float(goal_state.pos_error)
-            fb.rot_error = float(goal_state.rot_error)
-            fb.elapsed_sec = float(time.monotonic() - goal_state.start_time)
-            goal_state.goal_handle.publish_feedback(fb)
-        except Exception:
-            pass
+        fb = self._ros.TeleportTcpAction.Feedback()
+        fb.pos_error = float(goal_state.pos_error)
+        fb.rot_error = float(goal_state.rot_error)
+        fb.elapsed_sec = float(time.monotonic() - goal_state.start_time)
+        goal_state.goal_handle.publish_feedback(fb)
 
     @staticmethod
     def _validate_joint_goal(goal_request) -> bool:
-        names = list(getattr(goal_request, "name", []))
-        positions = list(getattr(goal_request, "position", []))
+        names = list(goal_request.name)
+        positions = list(goal_request.position)
         if not positions:
             return False
         if names and len(names) != len(positions):
@@ -373,11 +342,8 @@ class TeleportActions:
 
     @staticmethod
     def _validate_tcp_goal(goal_request) -> bool:
-        target = getattr(goal_request, "target", None)
-        if target is None:
-            return False
-        frame_id = getattr(getattr(target, "header", None), "frame_id", "") or ""
-        frame_id = frame_id.strip()
+        target = goal_request.target
+        frame_id = target.header.frame_id.strip()
         if frame_id and frame_id not in _BASE_FRAMES and frame_id not in _WORLD_FRAMES:
             # Unknown frame; still accept but treat as base in sim thread.
             pass
@@ -399,14 +365,9 @@ class TeleportActions:
                 # Env may be mid-reset; retry until timeout.
                 return
             goal_state.applied = True
-
-        try:
-            robot = env.scene["robot"]
-            joint_names = list(robot.joint_names)
-            q = robot.data.joint_pos[0].detach().cpu().numpy()
-        except Exception as exc:
-            # Env may be mid-reset; retry until timeout.
-            return
+        robot = env.scene["robot"]
+        joint_names = list(robot.joint_names)
+        q = robot.data.joint_pos[0].detach().cpu().numpy()
 
         names = goal_state.joint_names or []
         targets = goal_state.joint_positions or []
@@ -446,15 +407,8 @@ class TeleportActions:
             return
 
         if not goal_state.applied:
-            if not self._ensure_pinocchio_setup():
-                self._complete_goal(goal_state, "aborted", "pinocchio unavailable or URDF load failed")
-                return
-
-            try:
-                robot = env.scene["robot"]
-            except Exception as exc:
-                self._complete_goal(goal_state, "aborted", f"robot unavailable: {exc}")
-                return
+            self._ensure_pinocchio_setup()
+            robot = env.scene["robot"]
 
             # goal_state.message temporarily stores the incoming frame_id.
             frame_id = (goal_state.message or "").strip()
@@ -464,27 +418,15 @@ class TeleportActions:
             pos = np.asarray(goal_state.target_pos_base, dtype=float).reshape(3)
             quat_wxyz = self._normalize_quat_wxyz(goal_state.target_quat_wxyz_base)
 
-            try:
-                if frame_id in _WORLD_FRAMES:
-                    root_pos_w = robot.data.root_pos_w[0].detach().cpu().numpy()
-                    root_quat_w = robot.data.root_quat_w[0].detach().cpu().numpy()
-                    pos, quat_wxyz = pos_util.world_to_base_pose(pos, quat_wxyz, root_pos_w, root_quat_w)
-            except Exception as exc:
-                self._complete_goal(goal_state, "aborted", f"frame conversion failed: {exc}")
-                return
+            if frame_id in _WORLD_FRAMES:
+                root_pos_w = robot.data.root_pos_w[0].detach().cpu().numpy()
+                root_quat_w = robot.data.root_quat_w[0].detach().cpu().numpy()
+                pos, quat_wxyz = pos_util.world_to_base_pose(pos, quat_wxyz, root_pos_w, root_quat_w)
 
-            try:
-                q_init = robot.data.joint_pos[0].detach().cpu().numpy()
-            except Exception as exc:
-                self._complete_goal(goal_state, "aborted", f"failed to read joints: {exc}")
-                return
+            q_init = robot.data.joint_pos[0].detach().cpu().numpy()
 
-            try:
-                target_link6 = self._tcp_base_to_link6(pos, quat_wxyz)
-                ok, q_sol = self._solve_ik_to_link6(q_init, target_link6)
-            except Exception as exc:
-                self._complete_goal(goal_state, "aborted", f"IK failed: {exc}")
-                return
+            target_link6 = self._tcp_base_to_link6(pos, quat_wxyz)
+            ok, q_sol = self._solve_ik_to_link6(q_init, target_link6)
 
             goal_state.ik_ok = bool(ok)
             goal_state.target_pos_base = np.asarray(pos, dtype=float).reshape(3)
@@ -517,29 +459,13 @@ class TeleportActions:
             return True
 
         if self._pinocchio is None:
-            try:
-                import pinocchio as _pinocchio  # type: ignore
+            import pinocchio as _pinocchio  # type: ignore
 
-                self._pinocchio = _pinocchio
-            except Exception as exc:
-                if self._node is not None:
-                    try:
-                        self._node.get_logger().warn(f"pinocchio import failed: {exc}")
-                    except Exception:
-                        pass
-                return False
+            self._pinocchio = _pinocchio
 
-        try:
-            model = self._pinocchio.buildModelFromUrdf(PIPER_URDF_PATH)
-            data = model.createData()
-            eef_frame_id = model.getFrameId("link6")
-        except Exception as exc:
-            if self._node is not None:
-                try:
-                    self._node.get_logger().warn(f"pinocchio URDF load failed: {exc}")
-                except Exception:
-                    pass
-            return False
+        model = self._pinocchio.buildModelFromUrdf(PIPER_URDF_PATH)
+        data = model.createData()
+        eef_frame_id = model.getFrameId("link6")
 
         self._pin_model = model
         self._pin_data = data
@@ -552,15 +478,7 @@ class TeleportActions:
         quat_xyzw = np.roll(quat_wxyz, -1)
         base_to_tcp = self._pinocchio.SE3(self._pinocchio.Quaternion(quat_xyzw), pos_b)
 
-        try:
-            body_offset_pos, body_offset_quat = pos_util.get_body_offset()
-        except Exception as exc:
-            if self._node is not None:
-                try:
-                    self._node.get_logger().warn(f"TCP body offset unavailable: {exc}")
-                except Exception:
-                    pass
-            raise
+        body_offset_pos, body_offset_quat = pos_util.get_body_offset()
         body_offset_quat_xyzw = np.roll(np.array(body_offset_quat, dtype=float), -1)
         body_offset_se3 = self._pinocchio.SE3(
             self._pinocchio.Quaternion(body_offset_quat_xyzw),
@@ -635,16 +553,13 @@ class TeleportActions:
             self._pinocchio.forwardKinematics(model, data, q)
             self._pinocchio.updateFramePlacements(model, data)
             curr = data.oMf[eef_frame_id]
-            try:
-                ref_frame = self._pinocchio.ReferenceFrame.LOCAL_WORLD_ALIGNED
-            except Exception:
-                ref_frame = self._pinocchio.ReferenceFrame.LOCAL
+            ref_frame = self._pinocchio.ReferenceFrame.LOCAL_WORLD_ALIGNED
             t_err_w = target_link6.translation - curr.translation
             R_c = curr.rotation
             R_t = target_link6.rotation
             R_err = R_c.T @ R_t
             rot_vec_local = self._log3_from_R(R_err)
-            if ref_frame == getattr(self._pinocchio.ReferenceFrame, "LOCAL_WORLD_ALIGNED", ref_frame):
+            if ref_frame == self._pinocchio.ReferenceFrame.LOCAL_WORLD_ALIGNED:
                 pos_err = t_err_w
                 rot_vec = R_c @ rot_vec_local
             else:
@@ -657,10 +572,7 @@ class TeleportActions:
             J = np.asarray(J6)[:, :active_dofs]
             H = J.T @ J + (damping**2) * np.eye(J.shape[1])
             g = J.T @ err6
-            try:
-                dq = np.linalg.solve(H, g)
-            except np.linalg.LinAlgError:
-                dq = np.linalg.lstsq(H, g, rcond=None)[0]
+            dq = np.linalg.solve(H, g)
             dq = np.clip(dq, -0.2, 0.2)
             q[:active_dofs] += step_gain * dq
             err_norm = float(np.linalg.norm(err6))
@@ -677,16 +589,9 @@ class TeleportActions:
         if not positions:
             return False
 
-        try:
-            robot = env.scene["robot"]
-            joint_names = list(robot.joint_names)
-            name_to_index = {name: idx for idx, name in enumerate(joint_names)}
-        except Exception as exc:
-            try:
-                carb.log_warn(f"[scanbot.ros2_manager] teleport_joint: robot unavailable: {exc}")
-            except Exception:
-                pass
-            return False
+        robot = env.scene["robot"]
+        joint_names = list(robot.joint_names)
+        name_to_index = {name: idx for idx, name in enumerate(joint_names)}
 
         if names:
             indices: list[int] = []
@@ -700,57 +605,34 @@ class TeleportActions:
                 indices.append(idx)
                 pos_vals.append(float(pos))
             if not indices:
-                try:
-                    carb.log_warn(
-                        f"[scanbot.ros2_manager] teleport_joint: no matching joints (missing: {', '.join(missing)})"
-                    )
-                except Exception:
-                    pass
+                carb.log_warn(
+                    f"[scanbot.ros2_manager] teleport_joint: no matching joints (missing: {', '.join(missing)})"
+                )
                 return False
             idx_tensor = torch.tensor(indices, dtype=torch.long, device=env.device)
             pos_tensor = torch.tensor(pos_vals, dtype=torch.float32, device=env.device).unsqueeze(0)
             vel_tensor = torch.zeros_like(pos_tensor)
-            try:
-                robot.write_joint_position_to_sim(pos_tensor, joint_ids=idx_tensor, env_ids=None)
-                robot.write_joint_velocity_to_sim(vel_tensor, joint_ids=idx_tensor, env_ids=None)
-                robot.set_joint_position_target(pos_tensor, joint_ids=idx_tensor, env_ids=None)
-                robot.set_joint_velocity_target(vel_tensor, joint_ids=idx_tensor, env_ids=None)
-                robot.write_data_to_sim()
-            except Exception as exc:
-                try:
-                    carb.log_warn(f"[scanbot.ros2_manager] teleport_joint failed: {exc}")
-                except Exception:
-                    pass
-                return False
+            robot.write_joint_position_to_sim(pos_tensor, joint_ids=idx_tensor, env_ids=None)
+            robot.write_joint_velocity_to_sim(vel_tensor, joint_ids=idx_tensor, env_ids=None)
+            robot.set_joint_position_target(pos_tensor, joint_ids=idx_tensor, env_ids=None)
+            robot.set_joint_velocity_target(vel_tensor, joint_ids=idx_tensor, env_ids=None)
+            robot.write_data_to_sim()
             if missing:
-                try:
-                    carb.log_warn(f"[scanbot.ros2_manager] teleport_joint: missing joints: {', '.join(missing)}")
-                except Exception:
-                    pass
+                carb.log_warn(f"[scanbot.ros2_manager] teleport_joint: missing joints: {', '.join(missing)}")
             return True
 
         pos_tensor = torch.tensor(positions, dtype=torch.float32, device=env.device)
         pos_tensor = pos_tensor.unsqueeze(0).repeat(env.num_envs, 1)
         vel_tensor = torch.zeros_like(pos_tensor)
         if len(positions) != len(joint_names):
-            try:
-                carb.log_warn(
-                    f"[scanbot.ros2_manager] teleport_joint: position length {len(positions)} "
-                    f"does not match joint count {len(joint_names)}"
-                )
-            except Exception:
-                pass
+            carb.log_warn(
+                f"[scanbot.ros2_manager] teleport_joint: position length {len(positions)} "
+                f"does not match joint count {len(joint_names)}"
+            )
             return False
 
-        try:
-            robot.write_joint_state_to_sim(pos_tensor, vel_tensor, env_ids=None)
-            robot.set_joint_position_target(pos_tensor, env_ids=None)
-            robot.set_joint_velocity_target(vel_tensor, env_ids=None)
-            robot.write_data_to_sim()
-        except Exception as exc:
-            try:
-                carb.log_warn(f"[scanbot.ros2_manager] teleport_joint failed: {exc}")
-            except Exception:
-                pass
-            return False
+        robot.write_joint_state_to_sim(pos_tensor, vel_tensor, env_ids=None)
+        robot.set_joint_position_target(pos_tensor, env_ids=None)
+        robot.set_joint_velocity_target(vel_tensor, env_ids=None)
+        robot.write_data_to_sim()
         return True

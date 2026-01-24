@@ -7,8 +7,6 @@ from typing import Any
 
 import numpy as np
 
-import carb
-
 from scanbot.common.marker_util import WorldDirectionMarker
 from scanbot.common import pos_util
 
@@ -20,19 +18,9 @@ from .config import (
     MARKER_POSE_TOPIC,
 )
 
-
-try:  # Isaac Sim runtime only
-    import isaacsim.util.debug_draw._debug_draw as omni_debug_draw
-except Exception:  # pragma: no cover
-    omni_debug_draw = None
-
-try:
-    import omni.usd
-    from pxr import Gf, UsdGeom
-except Exception:  # pragma: no cover
-    omni = None
-    Gf = None
-    UsdGeom = None
+import isaacsim.util.debug_draw._debug_draw as omni_debug_draw
+import omni.usd
+from pxr import Gf, UsdGeom
 
 
 _BASE_FRAMES = {"base", "base_link", "robot_base"}
@@ -62,55 +50,20 @@ class MarkerBridge:
         self._draw = None
         self._device = "cpu"
 
-        if self._node is not None and self._marker_msg_type is not None:
-            try:
-                self._marker_sub = self._node.create_subscription(
-                    self._marker_msg_type, MARKER_POSE_TOPIC, self._on_marker_msg, 10
-                )
-            except Exception as exc:
-                self._marker_sub = None
-                msg = f"[scanbot.ros2_manager] Failed to create marker subscription: {exc}"
-                try:
-                    carb.log_warn(msg)
-                except Exception:
-                    pass
-        elif self._marker_msg_type is None:
-            msg = "[scanbot.ros2_manager] MarkerPoseArray type missing; markers topic disabled."
-            try:
-                carb.log_warn(msg)
-            except Exception:
-                pass
-        if self._node is not None and self._empty_msg_type is not None:
-            try:
-                self._clear_sub = self._node.create_subscription(
-                    self._empty_msg_type, MARKER_CLEAR_TOPIC, self._on_clear_msg, 1
-                )
-            except Exception:
-                self._clear_sub = None
-            try:
-                self._debug_cube_sub = self._node.create_subscription(
-                    self._empty_msg_type, MARKER_DEBUG_CUBES_TOPIC, self._on_debug_cube_msg, 1
-                )
-            except Exception:
-                self._debug_cube_sub = None
+        self._marker_sub = self._node.create_subscription(
+            self._marker_msg_type, MARKER_POSE_TOPIC, self._on_marker_msg, 10
+        )
+        self._clear_sub = self._node.create_subscription(
+            self._empty_msg_type, MARKER_CLEAR_TOPIC, self._on_clear_msg, 1
+        )
+        self._debug_cube_sub = self._node.create_subscription(
+            self._empty_msg_type, MARKER_DEBUG_CUBES_TOPIC, self._on_debug_cube_msg, 1
+        )
 
     def shutdown(self) -> None:
-        if self._node is not None:
-            if self._marker_sub is not None:
-                try:
-                    self._node.destroy_subscription(self._marker_sub)
-                except Exception:
-                    pass
-            if self._clear_sub is not None:
-                try:
-                    self._node.destroy_subscription(self._clear_sub)
-                except Exception:
-                    pass
-            if self._debug_cube_sub is not None:
-                try:
-                    self._node.destroy_subscription(self._debug_cube_sub)
-                except Exception:
-                    pass
+        self._node.destroy_subscription(self._marker_sub)
+        self._node.destroy_subscription(self._clear_sub)
+        self._node.destroy_subscription(self._debug_cube_sub)
         self._marker_sub = None
         self._clear_sub = None
         self._debug_cube_sub = None
@@ -135,17 +88,11 @@ class MarkerBridge:
         if not self._marker_data:
             return
 
-        if self._draw is None and omni_debug_draw is not None:
-            try:
-                self._draw = omni_debug_draw.acquire_debug_draw_interface()
-            except Exception:
-                self._draw = None
+        if self._draw is None:
+            self._draw = omni_debug_draw.acquire_debug_draw_interface()
 
         if self._device == "cpu":
-            try:
-                self._device = str(env.device)
-            except Exception:
-                self._device = "cpu"
+            self._device = str(env.device)
 
         data_world = self._convert_to_world(env, self._marker_data, self._frame_id)
         if not data_world:
@@ -188,39 +135,30 @@ class MarkerBridge:
         self._spawn_debug_cubes_requested = True
 
     def _on_marker_msg(self, msg) -> None:
-        try:
-            frame_id = getattr(getattr(msg, "header", None), "frame_id", "") or ""
-        except Exception:
-            frame_id = ""
+        frame_id = msg.header.frame_id or ""
         self._frame_id = frame_id.strip() or "base"
 
-        markers = getattr(msg, "markers", None)
+        markers = msg.markers
         if not markers:
             self._clear_requested = True
             return
 
         data: list[_MarkerDatum] = []
         for entry in markers:
-            try:
-                pose7d = np.asarray(entry.pose7d, dtype=float).reshape(7)
-            except Exception:
-                continue
+            pose7d = np.asarray(entry.pose7d, dtype=float).reshape(7)
             pos = pose7d[:3]
             qx, qy, qz, qw = pose7d[3:].tolist()
             quat_wxyz = np.array([qw, qx, qy, qz], dtype=float)
-            color_msg = getattr(entry, "color", None)
-            if color_msg is None:
-                color = np.array([1.0, 0.0, 0.0, 1.0], dtype=float)
-            else:
-                color = np.array(
-                    [
-                        float(getattr(color_msg, "r", 1.0)),
-                        float(getattr(color_msg, "g", 0.0)),
-                        float(getattr(color_msg, "b", 0.0)),
-                        float(getattr(color_msg, "a", 1.0)),
-                    ],
-                    dtype=float,
-                )
+            color_msg = entry.color
+            color = np.array(
+                [
+                    float(color_msg.r),
+                    float(color_msg.g),
+                    float(color_msg.b),
+                    float(color_msg.a),
+                ],
+                dtype=float,
+            )
             data.append(_MarkerDatum(pos_w=pos, quat_wxyz=quat_wxyz, color_rgba=color))
 
         if not data:
@@ -232,13 +170,10 @@ class MarkerBridge:
     def _get_root_pose(self, env) -> tuple[np.ndarray | None, np.ndarray | None]:
         if env is None:
             return None, None
-        try:
-            robot = env.scene["robot"]
-            root_pos_w = robot.data.root_pos_w[0].detach().cpu().numpy()
-            root_quat_w = robot.data.root_quat_w[0].detach().cpu().numpy()
-            return root_pos_w, root_quat_w
-        except Exception:
-            return None, None
+        robot = env.scene["robot"]
+        root_pos_w = robot.data.root_pos_w[0].detach().cpu().numpy()
+        root_quat_w = robot.data.root_quat_w[0].detach().cpu().numpy()
+        return root_pos_w, root_quat_w
 
     def _convert_to_world(
         self,
@@ -251,12 +186,9 @@ class MarkerBridge:
         if frame_id in _WORLD_FRAMES:
             return data
         if frame_id not in _BASE_FRAMES and frame_id != "":
-            try:
-                self._node.get_logger().warn(
-                    f"Marker frame_id '{frame_id}' not recognized; interpreting as base frame."
-                )
-            except Exception:
-                pass
+            self._node.get_logger().warn(
+                f"Marker frame_id '{frame_id}' not recognized; interpreting as base frame."
+            )
         root_pos_w, root_quat_w = self._get_root_pose(env)
         if root_pos_w is None or root_quat_w is None:
             return []
@@ -291,19 +223,11 @@ class MarkerBridge:
 
     def _clear_all(self) -> None:
         if self._draw is not None:
-            try:
-                self._draw.clear_lines()
-            except Exception:
-                pass
+            self._draw.clear_lines()
         for marker in self._markers_by_color.values():
-            try:
-                marker.clear()
-            except Exception:
-                pass
+            marker.clear()
 
     def _spawn_debug_cubes(self, env) -> None:
-        if omni is None or UsdGeom is None or Gf is None:
-            return
         stage = omni.usd.get_context().get_stage()
         if stage is None:
             return
@@ -312,18 +236,12 @@ class MarkerBridge:
             return
 
         def _spawn_cube(path: str, pos_w, color_rgb, size: float):
-            try:
-                if stage.GetPrimAtPath(path):
-                    stage.RemovePrim(path)
-            except Exception:
-                pass
+            if stage.GetPrimAtPath(path):
+                stage.RemovePrim(path)
             prim = UsdGeom.Cube.Define(stage, path).GetPrim()
             cube = UsdGeom.Cube(prim)
             cube.CreateSizeAttr(float(size))
-            try:
-                UsdGeom.Gprim(prim).CreateDisplayColorAttr([Gf.Vec3f(*color_rgb)])
-            except Exception:
-                pass
+            UsdGeom.Gprim(prim).CreateDisplayColorAttr([Gf.Vec3f(*color_rgb)])
             xform = UsdGeom.Xformable(prim)
             xform.ClearXformOpOrder()
             xform.AddTranslateOp().Set(Gf.Vec3f(*pos_w))

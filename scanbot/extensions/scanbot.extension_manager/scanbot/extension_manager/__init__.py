@@ -37,30 +37,27 @@ class _RootChangeHandler(FileSystemEventHandler):
         # Only reload on events that indicate a content/path change.
         # Inotify can emit noisy "opened/closed/accessed" events which would otherwise trigger
         # reload loops during startup (extensions being scanned) or normal reads.
-        event_type = getattr(event, "event_type", "")
+        event_type = event.event_type
         if event_type not in {"modified", "created", "deleted", "moved"}:
             return
-        if getattr(event, "is_directory", False):
+        if event.is_directory:
             return
         if event_type == "moved":
-            path = Path(getattr(event, "dest_path", "") or getattr(event, "src_path", ""))
+            path = Path(event.dest_path or event.src_path)
         else:
-            path = Path(getattr(event, "src_path", ""))
-        try:
-            rel = path.relative_to(self._root)
-        except ValueError:
-            return
+            path = Path(event.src_path)
+        rel = path.relative_to(self._root)
         if "__pycache__" in rel.parts or path.suffix in {".pyc", ".pyo"}:
             return
         ext_dir = rel.parts[0] if rel.parts else ""
         if ext_dir in self._scanbot_exts:
             # Only trigger reload when file mtime actually changes.
-            try:
-                mtime_ns = path.stat().st_mtime_ns
-            except FileNotFoundError:
+            if event_type == "deleted":
                 mtime_ns = -1
-            except Exception:
-                mtime_ns = -2
+            elif path.exists():
+                mtime_ns = path.stat().st_mtime_ns
+            else:
+                mtime_ns = -1
 
             prev = self._mtimes_ns.get(path)
             if prev is not None and prev == mtime_ns:
@@ -135,13 +132,10 @@ class Extension(omni.ext.IExt):
         ext_toml = ext_dir / "extension.toml"
         if not ext_toml.is_file():
             return True
-        try:
-            data = toml.load(ext_toml)
-            scanbot_cfg = data.get("scanbot", {})
-            disabled = bool(scanbot_cfg.get("disabled", False))
-            return not disabled
-        except Exception:
-            return True
+        data = toml.load(ext_toml)
+        scanbot_cfg = data.get("scanbot", {})
+        disabled = bool(scanbot_cfg.get("disabled", False))
+        return not disabled
 
     def _enable_exts(self, ext_ids: Set[str]):
         if self._ext_mgr is None:
@@ -159,24 +153,14 @@ class Extension(omni.ext.IExt):
         if ext_id in self._reloading:
             return
         self._reloading.add(ext_id)
-        try:
-            self._loop.call_soon_threadsafe(
-                asyncio.create_task, self._reload_ext(ext_id, changed_path)
-            )
-        except RuntimeError:
-            self._reloading.discard(ext_id)
+        self._loop.call_soon_threadsafe(asyncio.create_task, self._reload_ext(ext_id, changed_path))
 
     async def _reload_ext(self, ext_id: str, changed_path: str):
-        # If this instance was reloaded/hot-swapped and state isn't ready, skip.
-        if not hasattr(self, "_reloading") or not hasattr(self, "_extensions_root"):
-            return
-        ext_mgr = getattr(self, "_ext_mgr", None)
-        if ext_mgr is None:
-            return
-        extensions_root = getattr(self, "_extensions_root", None)
-        if extensions_root is None:
-            return
-        cooldown = getattr(self, "_cooldown_sec", 1.0)
+        ext_mgr = self._ext_mgr
+        extensions_root = self._extensions_root
+        cooldown = self._cooldown_sec
+        if ext_mgr is None or extensions_root is None:
+            raise RuntimeError("Extension manager not initialized")
         try:
             # Re-read disabled flag just before acting.
             enabled_now = self._is_enabled(extensions_root / ext_id)
@@ -202,6 +186,4 @@ class Extension(omni.ext.IExt):
                 print(f"[scanbot.extension_manager] Skipped re-enable (disabled in extension.toml): {ext_id}")
             await asyncio.sleep(cooldown)
         finally:
-            reloading = getattr(self, "_reloading", None)
-            if isinstance(reloading, set):
-                reloading.discard(ext_id)
+            self._reloading.discard(ext_id)

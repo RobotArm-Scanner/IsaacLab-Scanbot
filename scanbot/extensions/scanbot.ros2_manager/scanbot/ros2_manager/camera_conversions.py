@@ -9,7 +9,7 @@ import torch
 
 
 def maybe_to_cpu(tensor: torch.Tensor) -> torch.Tensor:
-    if hasattr(tensor, "is_cuda") and tensor.is_cuda:
+    if tensor.is_cuda:
         return tensor.cpu()
     return tensor
 
@@ -225,79 +225,75 @@ def compute_pointcloud_world(
     stride: int,
 ) -> tuple[np.ndarray, np.ndarray] | None:
     """Compute a downsampled (world) point cloud from depth + rgb + camera pose."""
-    try:
-        depth = maybe_to_cpu(depth)
-        rgb = maybe_to_cpu(rgb)
-        intrinsic = maybe_to_cpu(intrinsic)
-        pos_world = maybe_to_cpu(pos_world)
-        quat_world_wxyz = maybe_to_cpu(quat_world_wxyz)
+    depth = maybe_to_cpu(depth)
+    rgb = maybe_to_cpu(rgb)
+    intrinsic = maybe_to_cpu(intrinsic)
+    pos_world = maybe_to_cpu(pos_world)
+    quat_world_wxyz = maybe_to_cpu(quat_world_wxyz)
 
-        if depth.dim() == 4:
-            depth = depth[0]
-        if depth.dim() == 3 and depth.shape[-1] == 1:
-            depth = depth[..., 0]
-        if depth.dim() != 2:
-            return None
-
-        if rgb.dim() == 4:
-            rgb = rgb[0]
-        if rgb.dim() != 3:
-            return None
-        if rgb.shape[-1] == 4:
-            rgb = rgb[..., :3]
-
-        if rgb.dtype != torch.uint8:
-            rgb = (rgb.clamp(0, 1) * 255).to(dtype=torch.uint8)
-
-        depth = depth.to(dtype=torch.float32)
-
-        if intrinsic.dim() == 3:
-            intrinsic = intrinsic[0]
-        if intrinsic.shape != (3, 3):
-            return None
-        intrinsic = intrinsic.to(dtype=torch.float32)
-        fx = float(intrinsic[0, 0])
-        fy = float(intrinsic[1, 1])
-        cx = float(intrinsic[0, 2])
-        cy = float(intrinsic[1, 2])
-        if fx == 0.0 or fy == 0.0:
-            return None
-
-        h0, w0 = int(depth.shape[0]), int(depth.shape[1])
-        stride = max(1, int(stride))
-        u = torch.arange(0, w0, step=stride, dtype=torch.float32)
-        v = torch.arange(0, h0, step=stride, dtype=torch.float32)
-        depth_ds = depth[::stride, ::stride]
-        rgb_ds = rgb[::stride, ::stride, :]
-        vv, uu = torch.meshgrid(v, u, indexing="ij")
-        if depth_ds.shape != vv.shape:
-            return None
-
-        z = depth_ds
-        x = (uu - cx) / fx * z
-        y = (vv - cy) / fy * z
-
-        pts_cam = torch.stack((x, y, z), dim=-1).reshape(-1, 3)
-        cols = rgb_ds.reshape(-1, 3)
-
-        valid = torch.isfinite(pts_cam).all(dim=1) & torch.isfinite(pts_cam[:, 2]) & (pts_cam[:, 2] > 0.0)
-        if not bool(valid.any()):
-            return np.zeros((0, 3), dtype=np.float32), np.zeros((0, 3), dtype=np.uint8)
-
-        pts_cam = pts_cam[valid]
-        cols = cols[valid]
-
-        R = _quat_to_matrix_wxyz(quat_world_wxyz)
-        pos = pos_world.to(dtype=torch.float32)
-        if pos.dim() > 1:
-            pos = pos[0]
-        if pos.numel() != 3:
-            return None
-        pts_world = pts_cam @ R.T + pos[None, :]
-
-        pts_np = pts_world.contiguous().cpu().numpy().astype(np.float32, copy=False)
-        cols_np = cols.contiguous().cpu().numpy().astype(np.uint8, copy=False)
-        return pts_np, cols_np
-    except Exception:
+    if depth.dim() == 4:
+        depth = depth[0]
+    if depth.dim() == 3 and depth.shape[-1] == 1:
+        depth = depth[..., 0]
+    if depth.dim() != 2:
         return None
 
+    if rgb.dim() == 4:
+        rgb = rgb[0]
+    if rgb.dim() != 3:
+        return None
+    if rgb.shape[-1] == 4:
+        rgb = rgb[..., :3]
+
+    if rgb.dtype != torch.uint8:
+        rgb = (rgb.clamp(0, 1) * 255).to(dtype=torch.uint8)
+
+    depth = depth.to(dtype=torch.float32)
+
+    if intrinsic.dim() == 3:
+        intrinsic = intrinsic[0]
+    if intrinsic.shape != (3, 3):
+        return None
+    intrinsic = intrinsic.to(dtype=torch.float32)
+    fx = float(intrinsic[0, 0])
+    fy = float(intrinsic[1, 1])
+    cx = float(intrinsic[0, 2])
+    cy = float(intrinsic[1, 2])
+    if fx == 0.0 or fy == 0.0:
+        return None
+
+    h0, w0 = int(depth.shape[0]), int(depth.shape[1])
+    stride = max(1, int(stride))
+    u = torch.arange(0, w0, step=stride, dtype=torch.float32)
+    v = torch.arange(0, h0, step=stride, dtype=torch.float32)
+    depth_ds = depth[::stride, ::stride]
+    rgb_ds = rgb[::stride, ::stride, :]
+    vv, uu = torch.meshgrid(v, u, indexing="ij")
+    if depth_ds.shape != vv.shape:
+        return None
+
+    z = depth_ds
+    x = (uu - cx) / fx * z
+    y = (vv - cy) / fy * z
+
+    pts_cam = torch.stack((x, y, z), dim=-1).reshape(-1, 3)
+    cols = rgb_ds.reshape(-1, 3)
+
+    valid = torch.isfinite(pts_cam).all(dim=1) & torch.isfinite(pts_cam[:, 2]) & (pts_cam[:, 2] > 0.0)
+    if not bool(valid.any()):
+        return np.zeros((0, 3), dtype=np.float32), np.zeros((0, 3), dtype=np.uint8)
+
+    pts_cam = pts_cam[valid]
+    cols = cols[valid]
+
+    R = _quat_to_matrix_wxyz(quat_world_wxyz)
+    pos = pos_world.to(dtype=torch.float32)
+    if pos.dim() > 1:
+        pos = pos[0]
+    if pos.numel() != 3:
+        return None
+    pts_world = pts_cam @ R.T + pos[None, :]
+
+    pts_np = pts_world.contiguous().cpu().numpy().astype(np.float32, copy=False)
+    cols_np = cols.contiguous().cpu().numpy().astype(np.uint8, copy=False)
+    return pts_np, cols_np

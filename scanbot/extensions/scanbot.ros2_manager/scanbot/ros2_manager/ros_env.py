@@ -69,42 +69,22 @@ def _try_import_ros() -> bool:
         from rclpy.callback_groups import ReentrantCallbackGroup as _ReentrantCallbackGroup
         from rclpy.executors import MultiThreadedExecutor as _MultiThreadedExecutor
         from rclpy.qos import QoSProfile as _QoSProfile, ReliabilityPolicy as _ReliabilityPolicy, HistoryPolicy as _HistoryPolicy
-        # Reload scanbot_msgs.srv to pick up newly generated service classes.
-        try:
-            import importlib
-            import scanbot_msgs.srv as _scanbot_msgs_srv
+        # Reload scanbot_msgs.* to pick up newly generated classes.
+        import importlib
+        import scanbot_msgs.srv as _scanbot_msgs_srv
+        import scanbot_msgs.action as _scanbot_msgs_action
+        import scanbot_msgs.msg as _scanbot_msgs_msg
 
-            importlib.invalidate_caches()
-            importlib.reload(_scanbot_msgs_srv)
-        except Exception:
-            pass
-        # Reload scanbot_msgs.action to pick up newly generated action classes.
-        try:
-            import importlib
-            import scanbot_msgs.action as _scanbot_msgs_action
-
-            importlib.invalidate_caches()
-            importlib.reload(_scanbot_msgs_action)
-        except Exception:
-            pass
-        # Reload scanbot_msgs.msg to pick up newly generated message classes.
-        try:
-            import importlib
-            import scanbot_msgs.msg as _scanbot_msgs_msg
-
-            importlib.invalidate_caches()
-            importlib.reload(_scanbot_msgs_msg)
-        except Exception:
-            pass
+        importlib.invalidate_caches()
+        importlib.reload(_scanbot_msgs_srv)
+        importlib.reload(_scanbot_msgs_action)
+        importlib.reload(_scanbot_msgs_msg)
         from scanbot_msgs.action import TargetTcp as _TargetTcp
         from scanbot_msgs.action import TeleportJoints as _TeleportJointsAction
         from scanbot_msgs.action import TeleportTcp as _TeleportTcpAction
         from scanbot_msgs.srv import TeleportJoints as _TeleportJoints
         from scanbot_msgs.srv import TeleportTcp as _TeleportTcp
-        try:
-            from scanbot_msgs.srv import GetJointLimits as _GetJointLimits
-        except Exception:
-            _GetJointLimits = None
+        from scanbot_msgs.srv import GetJointLimits as _GetJointLimits
         from scanbot_msgs.msg import MarkerPoseArray as _MarkerPoseArray
         from geometry_msgs.msg import PoseStamped as _PoseStamped
         from sensor_msgs.msg import Image as _Image
@@ -147,7 +127,7 @@ def _try_import_ros() -> bool:
         _ROS_AVAILABLE = True
         _ROS_IMPORT_ERROR = ""
         return True
-    except Exception as exc:  # pragma: no cover
+    except ImportError as exc:  # pragma: no cover
         _ROS_AVAILABLE = False
         _ROS_IMPORT_ERROR = str(exc)
         _ROS_IMPORTS = None
@@ -165,15 +145,12 @@ def _bootstrap_ros2_env() -> None:
         setup_scripts.append(ros_setup)
 
     # Try workspace location relative to this extension path.
-    try:
-        ext_path = Path(__file__).resolve()
-        for parent in ext_path.parents:
-            ws_setup = parent / "scanbot" / "ros2" / "install" / "setup.bash"
-            if ws_setup.is_file():
-                setup_scripts.append(str(ws_setup))
-                break
-    except Exception:
-        pass
+    ext_path = Path(__file__).resolve()
+    for parent in ext_path.parents:
+        ws_setup = parent / "scanbot" / "ros2" / "install" / "setup.bash"
+        if ws_setup.is_file():
+            setup_scripts.append(str(ws_setup))
+            break
 
     # Try common workspace locations for scanbot_msgs install.
     candidate_roots = ["/workspace/isaaclab", "/workspace"]
@@ -198,11 +175,7 @@ def _bootstrap_ros2_env() -> None:
         os.environ[var_name] = ":".join(parts)
 
     cmd = " && ".join([f"source {script}" for script in setup_scripts]) + " && env -0"
-    try:
-        output = subprocess.check_output(["bash", "-lc", cmd])
-    except Exception:
-        _ROS_ENV_BOOTSTRAPPED = True
-        return
+    output = subprocess.check_output(["bash", "-lc", cmd])
 
     for entry in output.split(b"\0"):
         if not entry:
@@ -217,11 +190,8 @@ def _bootstrap_ros2_env() -> None:
     py_path = os.environ.get("PYTHONPATH", "")
     py_paths = [p for p in py_path.split(":") if p]
     for path in reversed(py_paths):
-        try:
-            while path in sys.path:
-                sys.path.remove(path)
-        except Exception:
-            pass
+        while path in sys.path:
+            sys.path.remove(path)
         sys.path.insert(0, path)
 
     # If any ROS2-related modules were imported before bootstrapping (e.g. from Kit's
@@ -229,10 +199,7 @@ def _bootstrap_ros2_env() -> None:
     for prefix in ("rclpy", "rosidl_generator_py", "rosidl_parser", "scanbot_msgs"):
         for name in list(sys.modules.keys()):
             if name == prefix or name.startswith(prefix + "."):
-                try:
-                    del sys.modules[name]
-                except Exception:
-                    pass
+                del sys.modules[name]
 
     # Ensure scanbot_msgs libs and python packages are reachable even if hooks are incomplete.
     for root in candidate_roots:
@@ -248,54 +215,25 @@ def _bootstrap_ros2_env() -> None:
             for py_dir in pkg_root.glob("local/lib/python*/dist-packages"):
                 _prepend_env_path("PYTHONPATH", str(py_dir))
                 py_dir_str = str(py_dir)
-                try:
-                    while py_dir_str in sys.path:
-                        sys.path.remove(py_dir_str)
-                except Exception:
-                    pass
+                while py_dir_str in sys.path:
+                    sys.path.remove(py_dir_str)
                 sys.path.insert(0, py_dir_str)
             break
 
     msg = f"[scanbot.ros2_manager] Bootstrapped ROS2 env with: {setup_scripts}"
-    try:
-        carb.log_info(msg)
-    except Exception:
-        pass
+    carb.log_info(msg)
     _ROS_ENV_BOOTSTRAPPED = True
 
 
 def _ros2_typesupport_ok() -> bool:
-    try:
-        from rosidl_generator_py import import_type_support as _import_type_support
+    from rosidl_generator_py import import_type_support as _import_type_support
 
-        _import_type_support("scanbot_msgs")
-        return True
-    except Exception as exc:  # pragma: no cover - runtime only
-        global _ROS_IMPORT_ERROR
-        _ROS_IMPORT_ERROR = str(exc)
-        return False
+    _import_type_support("scanbot_msgs")
+    return True
 
 
 def _ros_imports_ready() -> bool:
-    if _ROS_IMPORTS is None:
-        return False
-    return all(
-        hasattr(_ROS_IMPORTS, attr)
-        for attr in (
-            "TargetTcp",
-            "TeleportJointsAction",
-            "TeleportTcpAction",
-            "TeleportTcp",
-            "TeleportJoints",
-            "MarkerPoseArray",
-            "PoseStamped",
-            "Image",
-            "CameraInfo",
-            "JointState",
-            "Empty",
-            "Trigger",
-        )
-    )
+    return _ROS_IMPORTS is not None
 
 
 _try_import_ros()

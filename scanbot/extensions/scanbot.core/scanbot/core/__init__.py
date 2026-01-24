@@ -33,8 +33,14 @@ def create_camera(
     xform.AddRotateXYZOp().Set(rotation_xyz_deg)
 
 
+def _viewport_api(viewport):
+    # Kit may return a ViewportAPI or a ViewportWindow depending on the call path.
+    return getattr(viewport, "viewport_api", viewport)
+
+
 def activate_camera(cam_path: str = CAM_PATH, viewport_window_name: str = DEFAULT_VIEWPORT_WINDOW_NAME) -> None:
-    vp_utils.get_viewport_from_window_name(viewport_window_name).set_active_camera(cam_path)
+    vp = vp_utils.get_viewport_from_window_name(viewport_window_name)
+    _viewport_api(vp).set_active_camera(cam_path)
 
 
 def find_cameras(*, suffix: str = CAMERA_SUFFIX, limit: int = CAMERA_VIEWPORT_MAX) -> list[tuple[str, str]]:
@@ -53,8 +59,7 @@ def create_camera_viewports(cameras: list[tuple[str, str]]) -> list[str]:
     titles: list[str] = []
     for title, cam_path in cameras:
         vp = vp_utils.get_viewport_from_window_name(title) or vp_utils.create_viewport_window(title)
-        if hasattr(vp, "viewport_api"):
-            vp.viewport_api.set_active_camera(cam_path)
+        _viewport_api(vp).set_active_camera(cam_path)
         titles.append(title)
     return titles
 

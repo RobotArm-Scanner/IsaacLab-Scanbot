@@ -15,5 +15,4 @@ class Extension(omni.ext.IExt):
         print(f"[scanbot.common] Started: {ext_id}")
 
     def on_shutdown(self) -> None:
-        ext_id = getattr(self, "_ext_id", "")
-        print(f"[scanbot.common] Stopped: {ext_id}")
+        print(f"[scanbot.common] Stopped: {self._ext_id}")

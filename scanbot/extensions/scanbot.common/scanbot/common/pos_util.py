@@ -5,17 +5,13 @@ from __future__ import annotations
 from typing import Iterable, Tuple
 
 import numpy as np
-import math
-
-try:  # Isaac Sim runtime
-    from pxr import Gf
-except Exception:  # pragma: no cover
-    Gf = None
+import torch
+from pxr import Gf
+import isaaclab.sim as sim_utils
 
 
 def _to_numpy(x, *, shape: Tuple[int, ...] | None = None) -> np.ndarray:
-    if hasattr(x, "detach"):
-        # torch.Tensor or similar
+    if torch.is_tensor(x):
         x = x.detach().cpu().numpy()
     arr = np.asarray(x, dtype=float)
     if shape is not None:
@@ -100,24 +96,13 @@ def _compose_offsets(
 
 def _quat_wxyz_from_deg_z_y_x(deg_xyz) -> np.ndarray:
     """Match collect3d's Gf.Rotation(Z)*Gf.Rotation(Y)*Gf.Rotation(X) convention."""
-    if Gf is not None:
-        r = (
-            Gf.Rotation(Gf.Vec3d(0, 0, 1), float(deg_xyz[2]))
-            * Gf.Rotation(Gf.Vec3d(0, 1, 0), float(deg_xyz[1]))
-            * Gf.Rotation(Gf.Vec3d(1, 0, 0), float(deg_xyz[0]))
-        )
-        q = r.GetQuat()
-        return np.array([float(q.GetReal()), *map(float, q.GetImaginary())], dtype=float)
-
-    rx, ry, rz = [math.radians(float(d)) for d in deg_xyz]
-    cx, sx = math.cos(rx / 2.0), math.sin(rx / 2.0)
-    cy, sy = math.cos(ry / 2.0), math.sin(ry / 2.0)
-    cz, sz = math.cos(rz / 2.0), math.sin(rz / 2.0)
-    # z * y * x order
-    qz = np.array([cz, 0.0, 0.0, sz], dtype=float)
-    qy = np.array([cy, 0.0, sy, 0.0], dtype=float)
-    qx = np.array([cx, sx, 0.0, 0.0], dtype=float)
-    return quat_mul_wxyz(quat_mul_wxyz(qz, qy), qx)
+    r = (
+        Gf.Rotation(Gf.Vec3d(0, 0, 1), float(deg_xyz[2]))
+        * Gf.Rotation(Gf.Vec3d(0, 1, 0), float(deg_xyz[1]))
+        * Gf.Rotation(Gf.Vec3d(1, 0, 0), float(deg_xyz[0]))
+    )
+    q = r.GetQuat()
+    return np.array([float(q.GetReal()), *map(float, q.GetImaginary())], dtype=float)
 
 
 # Offsets are configured at runtime from the active environment.
@@ -203,46 +188,20 @@ def configure_from_env(env, *, force: bool = False) -> bool:
     if _CONFIGURED and _CONFIGURED_ENV_ID == env_id and not force:
         return True
 
-    try:
-        import isaaclab.sim as sim_utils  # runtime only
-    except Exception as exc:
-        raise RuntimeError("isaaclab.sim unavailable; cannot resolve offsets.") from exc
+    cfg = env.cfg
+    action_term = env.action_manager.get_term("arm_action")
 
-    cfg = getattr(env, "cfg", None)
-    action_term = None
-    try:
-        action_term = env.action_manager.get_term("arm_action")
-    except Exception:
-        action_term = None
+    body_name = action_term.cfg.body_name
+    body_offset = action_term.cfg.body_offset
+    body_pos = body_offset.pos
+    body_quat = body_offset.rot
 
-    body_offset = None
-    body_name = None
-    if action_term is not None:
-        body_name = getattr(getattr(action_term, "cfg", None), "body_name", None)
-        body_offset = getattr(getattr(action_term, "cfg", None), "body_offset", None)
-    if body_offset is None and cfg is not None:
-        body_name = body_name or getattr(getattr(getattr(cfg, "actions", None), "arm_action", None), "body_name", None)
-        body_offset = getattr(getattr(getattr(cfg, "actions", None), "arm_action", None), "body_offset", None)
-
-    if body_offset is None:
-        raise RuntimeError("arm_action body_offset is missing; cannot configure TCP offset.")
-
-    body_pos = getattr(body_offset, "pos", None)
-    body_quat = getattr(body_offset, "rot", None)
-    if body_pos is None or body_quat is None:
-        raise RuntimeError("arm_action body_offset is incomplete.")
-
-    scene_cfg = getattr(cfg, "scene", None) if cfg is not None else None
-    robot_cfg = getattr(scene_cfg, "robot", None) if scene_cfg is not None else None
-    robot_path = getattr(robot_cfg, "prim_path", None) if robot_cfg is not None else None
-    if robot_path is None or body_name is None:
-        raise RuntimeError("Robot prim path/body name unavailable; cannot resolve mount/camera offsets.")
+    scene_cfg = cfg.scene
+    robot_path = scene_cfg.robot.prim_path
     link6_path = f"{robot_path}/{body_name}"
 
-    tool_path = getattr(getattr(scene_cfg, "tool", None), "prim_path", None)
-    camera_path = getattr(getattr(scene_cfg, "wrist_camera", None), "prim_path", None)
-    if camera_path is None:
-        raise RuntimeError("wrist_camera prim path missing; cannot resolve camera offset.")
+    tool_path = scene_cfg.tool.prim_path
+    camera_path = scene_cfg.wrist_camera.prim_path
 
     def _first_prim(path: str):
         prims = sim_utils.find_matching_prims(path)
@@ -251,15 +210,10 @@ def configure_from_env(env, *, force: bool = False) -> bool:
         return prims[0]
 
     link6_prim = _first_prim(link6_path)
-    tool_prim = _first_prim(tool_path) if tool_path is not None else None
+    tool_prim = _first_prim(tool_path)
     camera_prim = _first_prim(camera_path)
-
-    if tool_prim is not None:
-        mount_pos, mount_quat = sim_utils.resolve_prim_pose(tool_prim, ref_prim=link6_prim)
-        camera_pos, camera_quat = sim_utils.resolve_prim_pose(camera_prim, ref_prim=tool_prim)
-    else:
-        mount_pos, mount_quat = (0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0)
-        camera_pos, camera_quat = sim_utils.resolve_prim_pose(camera_prim, ref_prim=link6_prim)
+    mount_pos, mount_quat = sim_utils.resolve_prim_pose(tool_prim, ref_prim=link6_prim)
+    camera_pos, camera_quat = sim_utils.resolve_prim_pose(camera_prim, ref_prim=tool_prim)
 
     _set_offsets(body_pos, body_quat, mount_pos, mount_quat, camera_pos, camera_quat)
     _CONFIGURED = True

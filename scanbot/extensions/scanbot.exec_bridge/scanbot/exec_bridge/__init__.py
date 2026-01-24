@@ -20,25 +20,10 @@ import carb
 
 from scanbot.scripts import scanbot_context
 
-try:
-    import numpy as np  # type: ignore
-except Exception:  # pragma: no cover
-    np = None
-
-try:
-    import torch  # type: ignore
-except Exception:  # pragma: no cover
-    torch = None
-
-try:
-    import isaaclab.sim as sim_utils  # type: ignore
-except Exception:  # pragma: no cover
-    sim_utils = None
-
-try:
-    from scanbot.common import pos_util  # type: ignore
-except Exception:  # pragma: no cover
-    pos_util = None
+import numpy as np  # type: ignore
+import torch  # type: ignore
+import isaaclab.sim as sim_utils  # type: ignore
+from scanbot.common import pos_util  # type: ignore
 
 
 @dataclass
@@ -169,11 +154,8 @@ class Extension(omni.ext.IExt):
 
     def on_shutdown(self) -> None:
         if self._server is not None:
-            try:
-                self._server.shutdown()
-                self._server.server_close()
-            except Exception:
-                pass
+            self._server.shutdown()
+            self._server.server_close()
             self._server = None
         if self._thread is not None:
             self._thread.join(timeout=2.0)
@@ -189,8 +171,6 @@ class Extension(omni.ext.IExt):
             return {"ok": False, "error": "mode must be exec or eval"}, 400
 
         result_expr = payload.get("result_expr")
-        if result_expr is not None and not isinstance(result_expr, str):
-            return {"ok": False, "error": "result_expr must be a string"}, 400
 
         timeout = float(payload.get("timeout_sec", self._default_timeout))
         timeout = max(0.1, min(timeout, 120.0))

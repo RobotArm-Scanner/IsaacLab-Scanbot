@@ -52,12 +52,11 @@ class Extension(omni.ext.IExt):
         print(f"[scanbot.keyboard_teleop] Stopped: {self._ext_id}")
 
     def _on_keyboard_event(self, event, *args):
-        key_input = getattr(event, "input", None)
+        key_input = event.input
         if isinstance(key_input, str):
             key = key_input.upper()
         else:
-            name = getattr(key_input, "name", "")
-            key = name.upper() if isinstance(name, str) else ""
+            key = key_input.name.upper()
         if not key:
             return True
         if key in {"ESCAPE", "SPACE"}:

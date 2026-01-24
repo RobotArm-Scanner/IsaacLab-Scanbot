@@ -15,12 +15,6 @@ import omni.ui as ui
 
 WINDOW_TITLE = "Scanbot Simple GUI"
 MENU_PATH = "Window/Scanbot/Simple GUI"
-# Dock preference is optional because some Kit builds don't expose LEFT_TOP.
-DOCK_PREF_LEFT_TOP = getattr(ui.DockPreference, "LEFT_TOP", None)
-# Older Kit may not expose FontWeight; default to normal weight.
-FONT_SEMIBOLD = getattr(ui, "FontWeight", None)
-if FONT_SEMIBOLD is not None:
-    FONT_SEMIBOLD = getattr(ui.FontWeight, "SEMIBOLD", None)
 
 
 class Extension(omni.ext.IExt):
@@ -46,30 +40,21 @@ class Extension(omni.ext.IExt):
         ui.Workspace.set_show_window_fn(WINDOW_TITLE, self._show_window_from_workspace)
 
     def on_shutdown(self) -> None:
-        if self._menu is not None:
-            menu = omni.kit.ui.get_editor_menu()
-            try:
-                menu.remove_item(MENU_PATH)
-            except Exception as exc:
-                carb.log_warn(f"[scanbot.simple_gui] Failed to remove menu: {exc}")
-            self._menu = None
+        menu = omni.kit.ui.get_editor_menu()
+        menu.remove_item(MENU_PATH)
+        self._menu = None
         carb.log_info(f"[scanbot.simple_gui] Shutting down extension: {self._ext_id}")
         ui.Workspace.set_show_window_fn(WINDOW_TITLE, None)
         self._window = None
 
     def _build_ui(self) -> None:
-        if DOCK_PREF_LEFT_TOP is not None:
-            self._window = ui.Window(
-                WINDOW_TITLE, width=360, height=240, dockPreference=DOCK_PREF_LEFT_TOP
-            )
-        else:
-            self._window = ui.Window(WINDOW_TITLE, width=360, height=240)
+        self._window = ui.Window(WINDOW_TITLE, width=360, height=240)
         with self._window.frame:
             with ui.VStack(spacing=8, height=0):
                 ui.Label(
                     "Scanbot UI Examples",
                     height=22,
-                    style={"font_size": 18, **({"font_weight": FONT_SEMIBOLD} if FONT_SEMIBOLD else {})},
+                    style={"font_size": 18},
                 )
                 ui.Label(
                     "Move the slider and click the button to see logs and status text update.",
@@ -114,10 +99,7 @@ class Extension(omni.ext.IExt):
     def _sync_menu_with_window(self):
         if self._menu is not None and self._window is not None:
             menu = omni.kit.ui.get_editor_menu()
-            try:
-                menu.set_value(MENU_PATH, self._window.visible)
-            except Exception as exc:
-                carb.log_warn(f"[scanbot.simple_gui] Failed to sync menu state: {exc}")
+            menu.set_value(MENU_PATH, self._window.visible)
 
     def _show_window_from_workspace(self, *_):
         self._toggle_window(True)

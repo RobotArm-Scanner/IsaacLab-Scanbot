@@ -16,13 +16,6 @@ from scanbot.scripts import scanbot_context
 
 WINDOW_TITLE = "Scanbot Random Pose"
 
-# Dock preference is optional because some Kit builds don't expose LEFT_TOP.
-DOCK_PREF_LEFT_TOP = getattr(ui.DockPreference, "LEFT_TOP", None)
-# Older Kit may not expose FontWeight; default to normal weight.
-FONT_SEMIBOLD = getattr(ui, "FontWeight", None)
-if FONT_SEMIBOLD is not None:
-    FONT_SEMIBOLD = getattr(ui.FontWeight, "SEMIBOLD", None)
-
 
 class Extension(omni.ext.IExt):
     def on_startup(self, ext_id: str) -> None:
@@ -41,25 +34,19 @@ class Extension(omni.ext.IExt):
         print(f"[scanbot.random_pose] Started: {ext_id}")
 
     def on_shutdown(self) -> None:
-        if self._sub is not None:
-            self._sub.unsubscribe()
-            self._sub = None
+        self._sub.unsubscribe()
+        self._sub = None
         self._window = None
         print(f"[scanbot.random_pose] Stopped: {self._ext_id}")
 
     def _build_ui(self) -> None:
-        if DOCK_PREF_LEFT_TOP is not None:
-            self._window = ui.Window(
-                WINDOW_TITLE, width=300, height=140, dockPreference=DOCK_PREF_LEFT_TOP
-            )
-        else:
-            self._window = ui.Window(WINDOW_TITLE, width=300, height=140)
+        self._window = ui.Window(WINDOW_TITLE, width=300, height=140)
         with self._window.frame:
             with ui.VStack(spacing=8, height=0):
                 ui.Label(
                     "Randomize (queued to launcher)",
                     height=22,
-                    style={"font_size": 18, **({"font_weight": FONT_SEMIBOLD} if FONT_SEMIBOLD else {})},
+                    style={"font_size": 18},
                 )
 
                 ui.Button("Random!", height=24, clicked_fn=self._on_random_clicked)
@@ -92,14 +79,10 @@ class Extension(omni.ext.IExt):
         self._set_status("Random action enqueued.")
 
     def _make_random_action(self, env, scale: float = 1.0):
-        try:
-            dim = env.action_manager.total_action_dim
-            shape = (env.num_envs, dim)
-            device = env.device
-            return (torch.rand(shape, device=device) * 2 - 1) * scale
-        except Exception as exc:
-            print(f"[scanbot.random_pose] Failed to build action: {exc}")
-            return None
+        dim = env.action_manager.total_action_dim
+        shape = (env.num_envs, dim)
+        device = env.device
+        return (torch.rand(shape, device=device) * 2 - 1) * scale
 
     def _set_status(self, text: str, error: bool = False) -> None:
         self._status_model.set_value(text)

@@ -53,12 +53,9 @@ class WorldDirectionMarker:
         mk_cfg = SPHERE_MARKER_CFG.copy()
         mk_cfg.prim_path = self._sphere_prim_path
         if self._sphere_color is not None:
-            try:
-                mk_cfg.markers["sphere"].visual_material = sim_utils.PreviewSurfaceCfg(
-                    diffuse_color=self._sphere_color, roughness=0.3
-                )
-            except Exception:
-                pass
+            mk_cfg.markers["sphere"].visual_material = sim_utils.PreviewSurfaceCfg(
+                diffuse_color=self._sphere_color, roughness=0.3
+            )
         self._state[self._sphere_state_key] = VisualizationMarkers(cfg=mk_cfg)
         return self._state[self._sphere_state_key]
 
@@ -84,16 +81,10 @@ class WorldDirectionMarker:
     def clear(self):
         mk_s = self._state.get(self._sphere_state_key)
         if mk_s is not None:
-            try:
-                mk_s.set_visibility(False)
-            except Exception:
-                pass
+            mk_s.set_visibility(False)
         mk_c = self._state.get(self._cone_state_key)
         if mk_c is not None:
-            try:
-                mk_c.set_visibility(False)
-            except Exception:
-                pass
+            mk_c.set_visibility(False)
 
     def render_points(
         self,

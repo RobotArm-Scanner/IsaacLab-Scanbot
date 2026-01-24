@@ -21,7 +21,7 @@ GAIN_ROT = _cfg.GAIN_ROT
 MAX_POS_STEP = _cfg.MAX_POS_STEP
 MAX_ROT_STEP = _cfg.MAX_ROT_STEP
 POS_ONLY_GATE = _cfg.POS_ONLY_GATE
-STABLE_STEPS = int(getattr(_cfg, "TARGET_TCP_STABLE_STEPS", 1))
+STABLE_STEPS = int(_cfg.TARGET_TCP_STABLE_STEPS)
 
 
 @dataclass
@@ -71,11 +71,7 @@ class TargetTcpAction:
 
     def shutdown(self) -> None:
         self.abort_active_goal("TargetTcpAction shutdown")
-        if self._action_server is not None:
-            try:
-                self._action_server.destroy()
-            except Exception:
-                pass
+        self._action_server.destroy()
         self._action_server = None
 
     def has_active_goal(self) -> bool:
@@ -104,12 +100,8 @@ class TargetTcpAction:
         if self._check_timeout(env_ready=True):
             return None
 
-        try:
-            target_pos = goal_state.target_pos_cpu.to(env.device).unsqueeze(0)
-            target_quat = goal_state.target_quat_cpu.to(env.device).unsqueeze(0)
-        except Exception as exc:
-            self._fail_goal(f"Failed to move target to device: {exc}")
-            return None
+        target_pos = goal_state.target_pos_cpu.to(env.device).unsqueeze(0)
+        target_quat = goal_state.target_quat_cpu.to(env.device).unsqueeze(0)
 
         pos_err, rot_err = self._math_utils.compute_pose_error(
             curr_pos[0:1],
@@ -152,17 +144,13 @@ class TargetTcpAction:
                 if delta_rot_norm > MAX_ROT_STEP:
                     delta_rot = rot_err_vec / rot_err_norm * MAX_ROT_STEP
 
-        try:
-            action_dim = env.action_manager.total_action_dim
-            if action_dim < 6:
-                raise RuntimeError(f"Expected action_dim >= 6, got {action_dim}")
-            action = torch.zeros((env.num_envs, action_dim), device=env.device)
-            action[:, 0:3] = delta_pos
-            action[:, 3:6] = delta_rot
-            return action
-        except Exception as exc:
-            self._fail_goal(f"Failed to build action: {exc}")
-            return None
+        action_dim = env.action_manager.total_action_dim
+        if action_dim < 6:
+            raise RuntimeError(f"Expected action_dim >= 6, got {action_dim}")
+        action = torch.zeros((env.num_envs, action_dim), device=env.device)
+        action[:, 0:3] = delta_pos
+        action[:, 3:6] = delta_rot
+        return action
 
     def _check_timeout(self, env_ready: bool) -> bool:
         with self._goal_lock:
@@ -254,13 +242,10 @@ class TargetTcpAction:
     def _publish_feedback(self, goal_state: GoalState) -> None:
         if self._node is None:
             return
-        try:
-            feedback = self._ros.TargetTcp.Feedback()
-            feedback.pos_error = float(goal_state.pos_error)
-            feedback.rot_error = float(goal_state.rot_error)
-            goal_state.goal_handle.publish_feedback(feedback)
-        except Exception:
-            pass
+        feedback = self._ros.TargetTcp.Feedback()
+        feedback.pos_error = float(goal_state.pos_error)
+        feedback.rot_error = float(goal_state.rot_error)
+        goal_state.goal_handle.publish_feedback(feedback)
 
     def _complete_goal(self, goal_state: GoalState, status: str, message: str) -> None:
         with self._goal_lock:
@@ -279,12 +264,11 @@ class TargetTcpAction:
 
     def _validate_goal(self, goal_request) -> bool:
         pose = goal_request.target.pose
-        frame_id = getattr(goal_request.target.header, "frame_id", "")
+        frame_id = goal_request.target.header.frame_id
         if frame_id and frame_id not in {"base", "base_link", "robot_base"}:
-            if self._node is not None:
-                self._node.get_logger().warn(
-                    f"Target frame_id '{frame_id}' is not base frame; interpreting as base frame anyway."
-                )
+            self._node.get_logger().warn(
+                f"Target frame_id '{frame_id}' is not base frame; interpreting as base frame anyway."
+            )
         vals = [
             pose.position.x,
             pose.position.y,
@@ -296,8 +280,7 @@ class TargetTcpAction:
         ]
         for val in vals:
             if not math.isfinite(val):
-                if self._node is not None:
-                    self._node.get_logger().warn("Rejecting goal: non-finite pose value")
+                self._node.get_logger().warn("Rejecting goal: non-finite pose value")
                 return False
         return True
 

@@ -17,30 +17,19 @@ class ResetEnvService:
         self._goal_active_fn = goal_active_fn
         self._srv = None
 
-        if self._node is None or self._ros is None or self._ros.Trigger is None:
+        if self._node is None or self._ros is None:
             return
 
         cb_group = self._ros.ReentrantCallbackGroup()
-        try:
-            self._srv = self._node.create_service(
-                self._ros.Trigger,
-                RESET_ENV_SERVICE,
-                self._on_reset,
-                callback_group=cb_group,
-            )
-        except Exception as exc:
-            self._srv = None
-            try:
-                self._node.get_logger().warn(f"Failed to create reset_env service: {exc}")
-            except Exception:
-                pass
+        self._srv = self._node.create_service(
+            self._ros.Trigger,
+            RESET_ENV_SERVICE,
+            self._on_reset,
+            callback_group=cb_group,
+        )
 
     def shutdown(self) -> None:
-        if self._node is not None and self._srv is not None:
-            try:
-                self._node.destroy_service(self._srv)
-            except Exception:
-                pass
+        self._node.destroy_service(self._srv)
         self._srv = None
 
     def _on_reset(self, _request, response):
@@ -75,30 +64,19 @@ class JointLimitsService:
         self._ros = ros
         self._srv = None
 
-        if self._node is None or self._ros is None or self._ros.GetJointLimits is None:
+        if self._node is None or self._ros is None:
             return
 
         cb_group = self._ros.ReentrantCallbackGroup()
-        try:
-            self._srv = self._node.create_service(
-                self._ros.GetJointLimits,
-                GET_JOINT_LIMITS_SERVICE,
-                self._on_get_joint_limits,
-                callback_group=cb_group,
-            )
-        except Exception as exc:
-            self._srv = None
-            try:
-                self._node.get_logger().warn(f"Failed to create get_joint_limits service: {exc}")
-            except Exception:
-                pass
+        self._srv = self._node.create_service(
+            self._ros.GetJointLimits,
+            GET_JOINT_LIMITS_SERVICE,
+            self._on_get_joint_limits,
+            callback_group=cb_group,
+        )
 
     def shutdown(self) -> None:
-        if self._node is not None and self._srv is not None:
-            try:
-                self._node.destroy_service(self._srv)
-            except Exception:
-                pass
+        self._node.destroy_service(self._srv)
         self._srv = None
 
     def _on_get_joint_limits(self, _request, response):
@@ -111,17 +89,9 @@ class JointLimitsService:
             response.upper = []
             return response
 
-        try:
-            robot = env.scene["robot"]
-            joint_names = list(getattr(robot, "joint_names", []))
-            limits = robot.data.joint_pos_limits[0].detach().cpu().numpy()
-        except Exception as exc:
-            response.success = False
-            response.message = f"failed to read joint limits: {exc}"
-            response.name = []
-            response.lower = []
-            response.upper = []
-            return response
+        robot = env.scene["robot"]
+        joint_names = list(robot.joint_names)
+        limits = robot.data.joint_pos_limits[0].detach().cpu().numpy()
 
         if limits.ndim != 2 or limits.shape[1] < 2:
             response.success = False
