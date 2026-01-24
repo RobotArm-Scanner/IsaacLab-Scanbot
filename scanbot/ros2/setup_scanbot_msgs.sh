@@ -40,11 +40,10 @@ export PYTHON_EXECUTABLE=/usr/bin/python3
 rm -rf "${BUILD_ROOT}" "${LOG_ROOT}" "${INSTALL_ROOT}"
 mkdir -p "${BUILD_ROOT}" "${LOG_ROOT}" "${INSTALL_ROOT}"
 cd "${WS_ROOT}"
-colcon build \
+colcon --log-base "${LOG_ROOT}" build \
   --packages-select scanbot_msgs \
   --build-base "${BUILD_ROOT}" \
   --install-base "${INSTALL_ROOT}" \
-  --log-base "${LOG_ROOT}" \
   --cmake-args \
   -DPython3_EXECUTABLE=/usr/bin/python3 \
   -DPYTHON_EXECUTABLE=/usr/bin/python3
