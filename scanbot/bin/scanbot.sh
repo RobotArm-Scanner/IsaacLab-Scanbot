@@ -7,6 +7,10 @@ DEVICE_ARG=""
 if [ -n "${SCANBOT_DEVICE:-}" ]; then
   DEVICE_ARG="--device ${SCANBOT_DEVICE}"
 fi
+HEADLESS_ARG=""
+if [ -z "${DISPLAY:-}" ]; then
+  HEADLESS_ARG="--headless"
+fi
 ACTIVE_GPU_ARG=""
 PHYSX_GPU_ARG=""
 if [ -n "${ACTIVE_GPU}" ]; then
@@ -25,4 +29,5 @@ script -q -f -e -a \
         --enable_cameras \
         --num_envs ${NUM_ENVS} \
         ${DEVICE_ARG} \
+        ${HEADLESS_ARG} \
         --kit_args \"${KIT_ARGS}\"'"

@@ -32,22 +32,36 @@ class Extension(omni.ext.IExt):
         self._reset_requested = False
 
         app = omni.kit.app.get_app()
+        self._input = carb.input.acquire_input_interface()
+        if self._input is None:
+            carb.log_warn("[scanbot.keyboard_teleop] Input interface unavailable; disabling teleop.")
+            return
+
+        app_window = omni.appwindow.get_default_app_window()
+        if app_window is None:
+            carb.log_warn("[scanbot.keyboard_teleop] No app window; disabling teleop.")
+            return
+
+        self._keyboard = app_window.get_keyboard()
+        if self._keyboard is None:
+            carb.log_warn("[scanbot.keyboard_teleop] No keyboard device; disabling teleop.")
+            return
+
         stream = app.get_update_event_stream()
         self._sub = stream.create_subscription_to_pop(self._on_update, name="scanbot.keyboard_teleop.update")
-
-        self._input = carb.input.acquire_input_interface()
-        self._keyboard = omni.appwindow.get_default_app_window().get_keyboard()
         self._kb_sub_id = self._input.subscribe_to_keyboard_events(self._keyboard, self._on_keyboard_event)
 
         print(f"[scanbot.keyboard_teleop] Started: {ext_id}")
 
     def on_shutdown(self) -> None:
-        self._input.unsubscribe_to_keyboard_events(self._keyboard, self._kb_sub_id)
+        if self._input is not None and self._keyboard is not None and self._kb_sub_id is not None:
+            self._input.unsubscribe_to_keyboard_events(self._keyboard, self._kb_sub_id)
         self._kb_sub_id = None
         self._keyboard = None
         self._input = None
-        self._sub.unsubscribe()
-        self._sub = None
+        if self._sub is not None:
+            self._sub.unsubscribe()
+            self._sub = None
         self._pressed.clear()
         print(f"[scanbot.keyboard_teleop] Stopped: {self._ext_id}")
 

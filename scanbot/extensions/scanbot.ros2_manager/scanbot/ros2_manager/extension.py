@@ -53,7 +53,7 @@ class Extension(omni.ext.IExt):
 
     def on_startup(self, ext_id: str) -> None:
         self._ext_id = ext_id
-        self._debug = str(os.getenv("SCANBOT_ROS2_DEBUG", "0")).lower() in {"1", "true", "yes"}
+        self._debug = os.getenv("SCANBOT_ROS2_DEBUG", "0") == "1"
         if self._debug:
             carb.log_info(
                 "[scanbot.ros2_manager] scanbot_context id=%s file=%s"
@@ -97,9 +97,20 @@ class Extension(omni.ext.IExt):
         )
         self._marker_bridge = MarkerBridge(self._node, ros.MarkerPoseArray, ros.Empty)
 
-        use_hook = str(os.getenv("SCANBOT_ROS2_HOOK_UPDATE", "0")).lower() in {"1", "true", "yes"}
-        use_timer = str(os.getenv("SCANBOT_ROS2_TIMER_UPDATE", "0")).lower() in {"1", "true", "yes"}
-        headless = str(os.getenv("HEADLESS", "0")).lower() in {"1", "true", "yes"}
+        def _env_is_one(name: str) -> bool:
+            return os.getenv(name, "") == "1"
+
+        use_hook = _env_is_one("SCANBOT_ROS2_HOOK_UPDATE")
+        use_timer = _env_is_one("SCANBOT_ROS2_TIMER_UPDATE")
+
+        headless = False
+        app_launcher = scanbot_context.get_app_launcher()
+        if app_launcher is not None:
+            headless = bool(getattr(app_launcher, "_headless", False))
+        if not headless:
+            headless = _env_is_one("HEADLESS") or _env_is_one("SCANBOT_HEADLESS")
+        if not headless:
+            headless = not os.getenv("DISPLAY")
         if headless and not use_hook:
             use_timer = True
         if use_hook:

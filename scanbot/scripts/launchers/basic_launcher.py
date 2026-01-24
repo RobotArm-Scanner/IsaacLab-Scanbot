@@ -56,22 +56,24 @@ from scanbot.scripts import scanbot_context
 
 def main() -> None:
     """Create the environment with the existing assets and drive it using queued actions."""
-    enable_extension("scanbot.extension_manager")
     scanbot_context.set_app_launcher(app_launcher)
+    enable_extension("scanbot.extension_manager")
 
     env_cfg = parse_env_cfg(args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs)
     env_cfg.env_name = args_cli.task
     env_cfg.terminations.time_out = None
 
-    env = gym.make(args_cli.task, cfg=env_cfg).unwrapped
-    env.sim.reset()
+    def _env_is_one(name: str) -> bool:
+        return os.getenv(name, "") == "1"
+
     headless = bool(getattr(app_launcher, "_headless", False))
     if not headless:
-        headless = str(os.getenv("HEADLESS", "0")).lower() in {"1", "true", "yes"}
+        headless = _env_is_one("HEADLESS") or _env_is_one("SCANBOT_HEADLESS")
     if not headless:
-        headless = str(os.getenv("SCANBOT_HEADLESS", "0")).lower() in {"1", "true", "yes"}
+        headless = not os.getenv("DISPLAY")
     if not simulation_app.is_running():
         headless = True
+    env = gym.make(args_cli.task, cfg=env_cfg).unwrapped
     if headless:
         env.cfg.wait_for_textures = False
         env.cfg.num_rerenders_on_reset = 0
