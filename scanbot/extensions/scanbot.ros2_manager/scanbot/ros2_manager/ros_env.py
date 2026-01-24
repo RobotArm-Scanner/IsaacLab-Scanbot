@@ -151,24 +151,6 @@ def _bootstrap_ros2_env() -> None:
         setup_scripts.append(str(opt_setup))
         install_roots.append(opt_install)
 
-    # Try workspace location relative to this extension path.
-    ext_path = Path(__file__).resolve()
-    for parent in ext_path.parents:
-        ws_setup = parent / "scanbot" / "ros2" / "install" / "setup.bash"
-        if ws_setup.is_file():
-            setup_scripts.append(str(ws_setup))
-            install_roots.append(ws_setup.parent)
-            break
-
-    # Try common workspace locations for scanbot_msgs install.
-    candidate_roots = ["/workspace/isaaclab", "/workspace"]
-    for root in candidate_roots:
-        ws_setup = Path(root) / "scanbot" / "ros2" / "install" / "setup.bash"
-        if ws_setup.is_file():
-            setup_scripts.append(str(ws_setup))
-            install_roots.append(ws_setup.parent)
-            break
-
     if not setup_scripts:
         _ROS_ENV_BOOTSTRAPPED = True
         return

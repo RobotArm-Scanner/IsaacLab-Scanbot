@@ -4,8 +4,6 @@ if [ -f /opt/ros/humble/setup.bash ]; then
 fi
 if [ -f /opt/scanbot_ros2/setup.bash ]; then
   source /opt/scanbot_ros2/setup.bash
-elif [ -f /workspace/isaaclab/scanbot/ros2/install/setup.bash ]; then
-  source /workspace/isaaclab/scanbot/ros2/install/setup.bash
 fi
 
 MULTI_GPU_ENABLED="${SCANBOT_MULTIGPU_ENABLED:-true}"
