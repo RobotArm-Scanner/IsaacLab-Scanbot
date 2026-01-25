@@ -111,8 +111,8 @@ class Extension(omni.ext.IExt):
             headless = _env_is_one("HEADLESS") or _env_is_one("SCANBOT_HEADLESS")
         if not headless:
             headless = not os.getenv("DISPLAY")
-        if headless and not use_hook:
-            use_timer = True
+        if headless and not use_hook and not use_timer:
+            use_hook = True
         if use_hook:
             self._hook_update_enabled = True
 
