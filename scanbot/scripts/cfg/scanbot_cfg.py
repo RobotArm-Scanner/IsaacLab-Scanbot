@@ -110,13 +110,12 @@ class ScanbotEnvCfg(BasicEnvCfg):
 
         support_properties = RigidBodyPropertiesCfg(kinematic_enabled=True, disable_gravity=True)
 
-        piper_root = os.path.join(
+        resources_root = os.path.join(
             os.environ.get("ISAACLAB_PATH", "/workspace/isaaclab"),
             "scanbot",
             "resources",
-            "piper_isaac_sim",
         )
-        my_usd_path = os.path.join(piper_root, "usd", "mouth", "Mouth_open_wo_tooth_root.usd")
+        my_usd_path = os.path.join(resources_root, "teeth_models", "model1", "Mouth_open_wo_tooth_root.usd")
 
         print(f"[DEBUG] usd_path (final str): {my_usd_path}")
 
@@ -168,7 +167,7 @@ class ScanbotEnvCfg(BasicEnvCfg):
         self.scene.robot = PIPER_NO_GRIPPER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
         # Visual tool on link6 (non-rigid)
-        tool_usd_path = os.path.join(piper_root, "usd", "tools", "case_with_scanner_colored.usd")
+        tool_usd_path = os.path.join(resources_root, "tools", "case_with_scanner_colored.usd")
         self.scene.tool = AssetBaseCfg(
             prim_path="{ENV_REGEX_NS}/Robot/link6/tool",
             spawn=UsdFileCfg(
