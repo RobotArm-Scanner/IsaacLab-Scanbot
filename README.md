@@ -1,141 +1,38 @@
-![Isaac Lab](docs/source/_static/isaaclab.jpg)
+# IsaacLab-ScanBot: 스캔봇 통합 시뮬레이션 환경
 
----
+강화학습 + 모방학습 + ROS2 전부를 지원하는 통합 시뮬레이션 환경을 구현합니다.
 
-# Isaac Lab
-
-[![IsaacSim](https://img.shields.io/badge/IsaacSim-5.1.0-silver.svg)](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html)
-[![Python](https://img.shields.io/badge/python-3.11-blue.svg)](https://docs.python.org/3/whatsnew/3.11.html)
-[![Linux platform](https://img.shields.io/badge/platform-linux--64-orange.svg)](https://releases.ubuntu.com/22.04/)
-[![Windows platform](https://img.shields.io/badge/platform-windows--64-orange.svg)](https://www.microsoft.com/en-us/)
-[![pre-commit](https://img.shields.io/github/actions/workflow/status/isaac-sim/IsaacLab/pre-commit.yaml?logo=pre-commit&logoColor=white&label=pre-commit&color=brightgreen)](https://github.com/isaac-sim/IsaacLab/actions/workflows/pre-commit.yaml)
-[![docs status](https://img.shields.io/github/actions/workflow/status/isaac-sim/IsaacLab/docs.yaml?label=docs&color=brightgreen)](https://github.com/isaac-sim/IsaacLab/actions/workflows/docs.yaml)
-[![License](https://img.shields.io/badge/license-BSD--3-yellow.svg)](https://opensource.org/licenses/BSD-3-Clause)
-[![License](https://img.shields.io/badge/license-Apache--2.0-yellow.svg)](https://opensource.org/license/apache-2-0)
-
-
-**Isaac Lab** is a GPU-accelerated, open-source framework designed to unify and simplify robotics research workflows,
-such as reinforcement learning, imitation learning, and motion planning. Built on [NVIDIA Isaac Sim](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html),
-it combines fast and accurate physics and sensor simulation, making it an ideal choice for sim-to-real
-transfer in robotics.
-
-Isaac Lab provides developers with a range of essential features for accurate sensor simulation, such as RTX-based
-cameras, LIDAR, or contact sensors. The framework's GPU acceleration enables users to run complex simulations and
-computations faster, which is key for iterative processes like reinforcement learning and data-intensive tasks.
-Moreover, Isaac Lab can run locally or be distributed across the cloud, offering flexibility for large-scale deployments.
-
-A detailed description of Isaac Lab can be found in our [arXiv paper](https://arxiv.org/abs/2511.04831).
-
-## Key Features
-
-Isaac Lab offers a comprehensive set of tools and environments designed to facilitate robot learning:
-
-- **Robots**: A diverse collection of robots, from manipulators, quadrupeds, to humanoids, with more than 16 commonly available models.
-- **Environments**: Ready-to-train implementations of more than 30 environments, which can be trained with popular reinforcement learning frameworks such as RSL RL, SKRL, RL Games, or Stable Baselines. We also support multi-agent reinforcement learning.
-- **Physics**: Rigid bodies, articulated systems, deformable objects
-- **Sensors**: RGB/depth/segmentation cameras, camera annotations, IMU, contact sensors, ray casters.
-
-
-## Getting Started
-
-### Documentation
-
-Our [documentation page](https://isaac-sim.github.io/IsaacLab) provides everything you need to get started, including
-detailed tutorials and step-by-step guides. Follow these links to learn more about:
-
-- [Installation steps](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html#local-installation)
-- [Reinforcement learning](https://isaac-sim.github.io/IsaacLab/main/source/overview/reinforcement-learning/rl_existing_scripts.html)
-- [Tutorials](https://isaac-sim.github.io/IsaacLab/main/source/tutorials/index.html)
-- [Available environments](https://isaac-sim.github.io/IsaacLab/main/source/overview/environments.html)
-
-
-## Isaac Sim Version Dependency
-
-Isaac Lab is built on top of Isaac Sim and requires specific versions of Isaac Sim that are compatible with each
-release of Isaac Lab. Below, we outline the recent Isaac Lab releases and GitHub branches and their corresponding
-dependency versions for Isaac Sim.
-
-| Isaac Lab Version             | Isaac Sim Version         |
-| ----------------------------- | ------------------------- |
-| `main` branch                 | Isaac Sim 4.5 / 5.0 / 5.1 |
-| `v2.3.X`                      | Isaac Sim 4.5 / 5.0 / 5.1 |
-| `v2.2.X`                      | Isaac Sim 4.5 / 5.0       |
-| `v2.1.X`                      | Isaac Sim 4.5             |
-| `v2.0.X`                      | Isaac Sim 4.5             |
-
-
-## Contributing to Isaac Lab
-
-We wholeheartedly welcome contributions from the community to make this framework mature and useful for everyone.
-These may happen as bug reports, feature requests, or code contributions. For details, please check our
-[contribution guidelines](https://isaac-sim.github.io/IsaacLab/main/source/refs/contributing.html).
-
-## Show & Tell: Share Your Inspiration
-
-We encourage you to utilize our [Show & Tell](https://github.com/isaac-sim/IsaacLab/discussions/categories/show-and-tell)
-area in the `Discussions` section of this repository. This space is designed for you to:
-
-* Share the tutorials you've created
-* Showcase your learning content
-* Present exciting projects you've developed
-
-By sharing your work, you'll inspire others and contribute to the collective knowledge
-of our community. Your contributions can spark new ideas and collaborations, fostering
-innovation in robotics and simulation.
-
-## Troubleshooting
-
-Please see the [troubleshooting](https://isaac-sim.github.io/IsaacLab/main/source/refs/troubleshooting.html) section for
-common fixes or [submit an issue](https://github.com/isaac-sim/IsaacLab/issues).
-
-For issues related to Isaac Sim, we recommend checking its [documentation](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html)
-or opening a question on its [forums](https://forums.developer.nvidia.com/c/agx-autonomous-machines/isaac/67).
-
-## Support
-
-* Please use GitHub [Discussions](https://github.com/isaac-sim/IsaacLab/discussions) for discussing ideas,
-  asking questions, and requests for new features.
-* Github [Issues](https://github.com/isaac-sim/IsaacLab/issues) should only be used to track executable pieces of
-  work with a definite scope and a clear deliverable. These can be fixing bugs, documentation issues, new features,
-  or general updates.
-
-## Connect with the NVIDIA Omniverse Community
-
-Do you have a project or resource you'd like to share more widely? We'd love to hear from you!
-Reach out to the NVIDIA Omniverse Community team at OmniverseCommunity@nvidia.com to explore opportunities
-to spotlight your work.
-
-You can also join the conversation on the [Omniverse Discord](https://discord.com/invite/nvidiaomniverse) to
-connect with other developers, share your projects, and help grow a vibrant, collaborative ecosystem
-where creativity and technology intersect. Your contributions can make a meaningful impact on the Isaac Lab
-community and beyond!
-
-## License
-
-The Isaac Lab framework is released under [BSD-3 License](LICENSE). The `isaaclab_mimic` extension and its
-corresponding standalone scripts are released under [Apache 2.0](LICENSE-mimic). The license files of its
-dependencies and assets are present in the [`docs/licenses`](docs/licenses) directory.
-
-Note that Isaac Lab requires Isaac Sim, which includes components under proprietary licensing terms. Please see the [Isaac Sim license](docs/licenses/dependencies/isaacsim-license.txt) for information on Isaac Sim licensing.
-
-Note that the `isaaclab_mimic` extension requires cuRobo, which has proprietary licensing terms that can be found in [`docs/licenses/dependencies/cuRobo-license.txt`](docs/licenses/dependencies/cuRobo-license.txt).
-
-
-## Citation
-
-If you use Isaac Lab in your research, please cite the technical report:
-
-```
-@article{mittal2025isaaclab,
-  title={Isaac Lab: A GPU-Accelerated Simulation Framework for Multi-Modal Robot Learning},
-  author={Mayank Mittal and Pascal Roth and James Tigue and Antoine Richard and Octi Zhang and Peter Du and Antonio Serrano-Muñoz and Xinjie Yao and René Zurbrügg and Nikita Rudin and Lukasz Wawrzyniak and Milad Rakhsha and Alain Denzler and Eric Heiden and Ales Borovicka and Ossama Ahmed and Iretiayo Akinola and Abrar Anwar and Mark T. Carlson and Ji Yuan Feng and Animesh Garg and Renato Gasoto and Lionel Gulich and Yijie Guo and M. Gussert and Alex Hansen and Mihir Kulkarni and Chenran Li and Wei Liu and Viktor Makoviychuk and Grzegorz Malczyk and Hammad Mazhar and Masoud Moghani and Adithyavairavan Murali and Michael Noseworthy and Alexander Poddubny and Nathan Ratliff and Welf Rehberg and Clemens Schwarke and Ritvik Singh and James Latham Smith and Bingjie Tang and Ruchik Thaker and Matthew Trepte and Karl Van Wyk and Fangzhou Yu and Alex Millane and Vikram Ramasamy and Remo Steiner and Sangeeta Subramanian and Clemens Volk and CY Chen and Neel Jawale and Ashwin Varghese Kuruttukulam and Michael A. Lin and Ajay Mandlekar and Karsten Patzwaldt and John Welsh and Huihua Zhao and Fatima Anes and Jean-Francois Lafleche and Nicolas Moënne-Loccoz and Soowan Park and Rob Stepinski and Dirk Van Gelder and Chris Amevor and Jan Carius and Jumyung Chang and Anka He Chen and Pablo de Heras Ciechomski and Gilles Daviet and Mohammad Mohajerani and Julia von Muralt and Viktor Reutskyy and Michael Sauter and Simon Schirm and Eric L. Shi and Pierre Terdiman and Kenny Vilella and Tobias Widmer and Gordon Yeoman and Tiffany Chen and Sergey Grizan and Cathy Li and Lotus Li and Connor Smith and Rafael Wiltz and Kostas Alexis and Yan Chang and David Chu and Linxi "Jim" Fan and Farbod Farshidian and Ankur Handa and Spencer Huang and Marco Hutter and Yashraj Narang and Soha Pouya and Shiwei Sheng and Yuke Zhu and Miles Macklin and Adam Moravanszky and Philipp Reist and Yunrong Guo and David Hoeller and Gavriel State},
-  journal={arXiv preprint arXiv:2511.04831},
-  year={2025},
-  url={https://arxiv.org/abs/2511.04831}
-}
+```bash
+scanbot
+ - bin: 시뮬레이터를 켜기 위한 시동 스크립트를 이곳에 정의합니다.
+ - extensions: 시뮬레이터에 통합되어야 할 추가기능을 이곳에 정의합니다.
+ - logs: 로깅용 디렉토리입니다. 자유롭게 활용해도 좋습니다. (내용물은 커밋 금지)
+ - resources: usd 파일 등의 시뮬레이션 리소스가 관리되는 폴더입니다.
+ - ros2: scanbot의 ros2 통합 소스들이 이곳에 위치합니다.
+ - scratch: 개발간 필요한 스크래치 디렉토리입니다. 중요한 잡동사니 파일이 아니면 이 폴더에다 새로운 파일을 넣고 커밋하지 마세요 
+ - scripts: ScanBot 시뮬레이터의 코어/환경 소스가 정의되는 곳입니다. 이곳의 소스는 조금 더 엄격하게 작성되어야 합니다.
+ - snippets: exec_bridge extension으로 실행 가능한 스니핏들을 이곳에 저장합니다.
 ```
 
-## Acknowledgement
+## Extensions
+- [scanbot.extension_manager](scanbot/extensions/scanbot.extension_manager/README.md): scanbot.* 확장 자동 enable + 파일 변경 시 자동 reload
+- [scanbot.core](scanbot/extensions/scanbot.core/README.md): 기본 카메라/뷰포트 세팅과 뷰포트 레이아웃 구성 (카메라 설정이 아니라 카메라 UI)
+- [scanbot.common](scanbot/extensions/scanbot.common/README.md): 확장 간 공용 유틸리티 모음
+- [scanbot.exec_bridge](scanbot/extensions/scanbot.exec_bridge/README.md): 실행 중 코드 스니핏을 HTTP로 실행하는 브리지
+- [scanbot.keyboard_teleop](scanbot/extensions/scanbot.keyboard_teleop/README.md): WASDQE 키보드 텔레옵
+- [scanbot.random_pose](scanbot/extensions/scanbot.random_pose/README.md): 랜덤 액션 1회 실행 버튼 UI
+- [scanbot.ros2_manager](scanbot/extensions/scanbot.ros2_manager/README.md): ROS2 액션/토픽/서비스 브리지
+- [scanbot.simple_gui](scanbot/extensions/scanbot.simple_gui/README.md): 최소 예제 GUI (슬라이더 + 버튼)
 
-Isaac Lab development initiated from the [Orbit](https://isaac-orbit.github.io/) framework.
-We gratefully acknowledge the authors of Orbit for their foundational contributions.
+## 개발 중요 원칙
+1. 컨테이너 내부의 설치 요소들은 환경 통일을 위해서, Dockerfile에 관련 구성이 정의되어야 합니다. 
+ - 환경에 포함되지 않은 의존성/리소스를 본인 컨테이너에만 설치하고, 소스에서 참고하는 형태가 되어서는 안됩니다.
+ - 번거롭더라도 컨테이너를 빌드해서 환경이 세팅이 되는지 확인 후 커밋해주세요.
+2. 현재 프로젝트는 소스 코드 품질을 위해서 다소 번거롭더라도 PR 검토를 할 예정입니다.
+3. 나중에 쓰지 못하는 구조로 코드를 짜는 것을 지양해주세요. (더 큰 비용으로 돌아옵니다)
+4. 다른 사람이 직관적으로 이해가 가능한 디렉토리와 네이밍 구조를 사용하세요.
+5. 각각의 디렉토리에 필요한 경우 README.md로 문서화를 하는 것을 적극 권장합니다.
+6. main에 직접 커밋하는 것은 핫픽스를 제외한 경우 불허합니다.
+7. 소스코드가 300~500줄을 넘어가는 경우, 대부분 잘못된 구조인 경우가 많습니다. 리팩토링을 적용해서 커밋해주세요.
+
+`source/*`에는 메인스트림 레포지토리의 소스가 들어가있습니다. 이곳의 소스코드는 직접 수정하거나, 우리의 소스를 같이 두는 것을 지양해주세요. (관리가 어려워집니다)
