@@ -8,10 +8,7 @@ _env: Any = None
 _action_queue: List[Any] = []
 _hook_queue: List[Callable[[], None]] = []
 
-try:
-    from scanbot.common import pos_util as _pos_util
-except Exception:
-    _pos_util = None
+from scanbot.scripts.utilities import pos_util as _pos_util
 
 def set_app_launcher(app_launcher: Any) -> None:
     global _app_launcher
@@ -25,11 +22,7 @@ def get_app_launcher() -> Any:
 def set_env(env: Any) -> None:
     global _env
     _env = env
-    if _pos_util is not None:
-        try:
-            _pos_util.configure_from_env(env)
-        except Exception:
-            pass
+    _pos_util.configure_from_env(env)
 
 
 def get_env() -> Any:

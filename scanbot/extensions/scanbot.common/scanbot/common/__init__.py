@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import omni.ext
 
-from . import marker_util, pos_util
+from . import marker_util
 
-__all__ = ["marker_util", "pos_util"]
+__all__ = ["marker_util"]
 
 
 class Extension(omni.ext.IExt):

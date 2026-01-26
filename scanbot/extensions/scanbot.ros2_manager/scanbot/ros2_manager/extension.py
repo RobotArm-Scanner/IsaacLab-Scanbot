@@ -10,7 +10,7 @@ import omni.ext
 import omni.kit.app
 
 from scanbot.scripts import scanbot_context
-from scanbot.common import pos_util
+from scanbot.scripts.utilities import pos_util
 
 from .camera_bridge import CameraBridge
 from .marker_bridge import MarkerBridge

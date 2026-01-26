@@ -14,7 +14,7 @@ import torch
 import carb
 
 from scanbot.scripts import scanbot_context
-from scanbot.common import pos_util
+from scanbot.scripts.utilities import pos_util
 
 from . import config as _cfg
 

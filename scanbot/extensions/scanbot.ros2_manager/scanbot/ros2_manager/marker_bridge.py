@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 
 from scanbot.common.marker_util import WorldDirectionMarker
-from scanbot.common import pos_util
+from scanbot.scripts.utilities import pos_util
 
 from .config import (
     MARKER_CLEAR_TOPIC,

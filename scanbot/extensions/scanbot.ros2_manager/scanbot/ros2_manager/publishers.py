@@ -8,7 +8,7 @@ import importlib
 import torch
 
 from . import config as _cfg
-from scanbot.common import pos_util as _pos_util
+from scanbot.scripts.utilities import pos_util as _pos_util
 
 # Force reload so hot-reloads of scanbot.common are reflected in this extension.
 pos_util = importlib.reload(_pos_util)

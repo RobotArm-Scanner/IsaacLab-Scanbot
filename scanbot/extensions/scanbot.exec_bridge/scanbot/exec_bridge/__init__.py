@@ -23,7 +23,7 @@ from scanbot.scripts import scanbot_context
 import numpy as np  # type: ignore
 import torch  # type: ignore
 import isaaclab.sim as sim_utils  # type: ignore
-from scanbot.common import pos_util  # type: ignore
+from scanbot.scripts.utilities import pos_util  # type: ignore
 
 
 @dataclass
