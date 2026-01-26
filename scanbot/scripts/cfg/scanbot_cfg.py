@@ -7,8 +7,6 @@
 
 import os
 
-from pxr import Gf
-
 from isaaclab.assets import AssetBaseCfg
 from isaaclab.assets import RigidObjectCfg
 from isaaclab.controllers.differential_ik_cfg import DifferentialIKControllerCfg
@@ -32,6 +30,7 @@ from isaaclab.sim.schemas.schemas_cfg import CollisionPropertiesCfg, RigidBodyPr
 from isaaclab.sim.spawners.from_files.from_files_cfg import UsdFileCfg
 from isaaclab.utils import configclass
 from isaaclab_tasks.manager_based.manipulation.stack import mdp
+from scanbot.scripts.utilities.pos_util import quat_wxyz_from_deg_xyz
 from scanbot.scripts.robots import piper_scanning_events
 from scanbot.scripts.cfg.basic_env_cfg import BasicEnvCfg
 from scanbot.scripts.robots.piper_no_gripper import PIPER_NO_GRIPPER_CFG
@@ -47,8 +46,12 @@ class EventCfg:
         params={
             # "default_pose": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
             # 카메라 각도 때문에 마지막 관절 값 0 유지
-            "default_pose": [0.14937140047550201, 1.8190464973449707, -0.6580374240875244, 0.1716867834329605,
-                             -1.0519624948501587, -0.08057491481304169],
+            "default_pose": [0.14937140047550201,
+                             1.8190464973449707,
+                             -0.6580374240875244,
+                             0.1716867834329605,
+                             -1.0519624948501587,
+                             -0.08057491481304169],
         },
     )
 
@@ -121,7 +124,10 @@ class ScanbotEnvCfg(BasicEnvCfg):
 
         self.scene.teeth = RigidObjectCfg(
             prim_path="{ENV_REGEX_NS}/Teeth",
-            init_state=RigidObjectCfg.InitialStateCfg(pos=[0.40 + 0.15, 0, 0.15], rot=[0.707, 0, 0, -0.707]),
+            init_state=RigidObjectCfg.InitialStateCfg(
+                pos=[0.40 + 0.15, 0, 0.15],
+                rot=tuple(quat_wxyz_from_deg_xyz((0.0, 0.0, -90.0))),
+            ),
             spawn=UsdFileCfg(
                 usd_path=my_usd_path,
                 scale=(0.08, 0.08, 0.08),
@@ -132,7 +138,10 @@ class ScanbotEnvCfg(BasicEnvCfg):
 
         self.scene.teeth_support = RigidObjectCfg(
             prim_path="{ENV_REGEX_NS}/TeethSupport",
-            init_state=RigidObjectCfg.InitialStateCfg(pos=[0.40 + 0.15, 0.0, 0.0], rot=[1, 0, 0, 0]),
+            init_state=RigidObjectCfg.InitialStateCfg(
+                pos=[0.40 + 0.15, 0.0, 0.0],
+                rot=tuple(quat_wxyz_from_deg_xyz((0.0, 0.0, 0.0))),
+            ),
             spawn=sim_utils.CuboidCfg(
                 size=(0.2, 0.2, 0.2),
                 rigid_props=support_properties,
@@ -177,13 +186,7 @@ class ScanbotEnvCfg(BasicEnvCfg):
             ),
             init_state=AssetBaseCfg.InitialStateCfg(
                 pos=(0.0, 0.0, 0.003),
-                rot=(lambda deg: (
-                    (lambda r: (float(r.GetQuat().GetReal()),) + tuple(map(float, r.GetQuat().GetImaginary())))(
-                        Gf.Rotation(Gf.Vec3d(0, 0, 1), float(deg[2]))
-                        * Gf.Rotation(Gf.Vec3d(0, 1, 0), float(deg[1]))
-                        * Gf.Rotation(Gf.Vec3d(1, 0, 0), float(deg[0]))
-                    )
-                ))((180.0, 0.0, 90.0)),
+                rot=tuple(quat_wxyz_from_deg_xyz((180.0, 0.0, 90.0))),
             ),
         )
 
@@ -201,18 +204,7 @@ class ScanbotEnvCfg(BasicEnvCfg):
             ),
             offset=CameraCfg.OffsetCfg(
                 pos=(-1.71854, -7.51282, -260.88225),
-                rot=(
-                    lambda deg: (
-                        (
-                            lambda r: (float(r.GetQuat().GetReal()),)
-                                      + tuple(map(float, r.GetQuat().GetImaginary()))
-                        )(
-                            Gf.Rotation(Gf.Vec3d(0, 0, 1), float(deg[2]))
-                            * Gf.Rotation(Gf.Vec3d(0, 1, 0), float(deg[1]))
-                            * Gf.Rotation(Gf.Vec3d(1, 0, 0), float(deg[0]))
-                        )
-                    )
-                )((90.0, 0.0, 0.0)),
+                rot=tuple(quat_wxyz_from_deg_xyz((90.0, 0.0, 0.0))),
             ),
         )
 
@@ -249,7 +241,7 @@ class ScanbotEnvCfg(BasicEnvCfg):
             ),
             offset=CameraCfg.OffsetCfg(
                 pos=(0.35 + 0.15, 0.0, 0.45),
-                rot=(0.7071067811865476, 4.329780281177467e-17, -4.329780281177467e-17, 0.7071067811865475),
+                rot=tuple(quat_wxyz_from_deg_xyz((0.0, 0.0, 90.0))),
                 convention="opengl",
             ),
         )
@@ -272,7 +264,7 @@ class ScanbotEnvCfg(BasicEnvCfg):
         #     ),
         #     offset=CameraCfg.OffsetCfg(
         #         pos=(0.22656 + 0.15, 0.49178, 0.67233),
-        #         rot=(5.549534652183772e-17, -2.5877905075098294e-17, -0.42261826174069944, -0.9063077870366499),
+        #         rot=tuple(quat_wxyz_from_deg_xyz((50.0, 0.0, -180.0))),
         #         convention="opengl",
         #     ),
         # )
@@ -295,7 +287,7 @@ class ScanbotEnvCfg(BasicEnvCfg):
         #     ),
         #     offset=CameraCfg.OffsetCfg(
         #         pos=(0.28186 + 0.15, 0.0, 0.2763),
-        #         rot=(0.6408746357270946, 0.2987970904839335, -0.2987970904839335, -0.6408746357270945),
+        #         rot=tuple(quat_wxyz_from_deg_xyz((50.0, 0.0, -90.0))),
         #         convention="opengl",
         #     ),
         # )
@@ -318,7 +310,7 @@ class ScanbotEnvCfg(BasicEnvCfg):
         #     ),
         #     offset=CameraCfg.OffsetCfg(
         #         pos=(0.4, 0.15, 0.1763),
-        #         rot=(0.2705980500730985, 0.27059805007309845, -0.6532814824381882, -0.6532814824381883),
+        #         rot=tuple(quat_wxyz_from_deg_xyz((90.0, 0.0, -135.0))),
         #         convention="opengl",
         #     ),
         # )
@@ -341,7 +333,7 @@ class ScanbotEnvCfg(BasicEnvCfg):
         #     ),
         #     offset=CameraCfg.OffsetCfg(
         #         pos=(0.4, -0.15, 0.1763),
-        #         rot=(0.6532814824381883, 0.6532814824381882, -0.2705980500730985, -0.27059805007309845),
+        #         rot=tuple(quat_wxyz_from_deg_xyz((90.0, 0.0, -45.0))),
         #         convention="opengl",
         #     ),
         # )

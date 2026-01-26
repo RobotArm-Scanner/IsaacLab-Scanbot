@@ -94,8 +94,8 @@ def _compose_offsets(
     return pos, quat
 
 
-def _quat_wxyz_from_deg_z_y_x(deg_xyz) -> np.ndarray:
-    """Match collect3d's Gf.Rotation(Z)*Gf.Rotation(Y)*Gf.Rotation(X) convention."""
+def quat_wxyz_from_deg_xyz(deg_xyz) -> np.ndarray:
+    """Euler deg -> quat (WXYZ), applied as Z * Y * X to match existing convention."""
     r = (
         Gf.Rotation(Gf.Vec3d(0, 0, 1), float(deg_xyz[2]))
         * Gf.Rotation(Gf.Vec3d(0, 1, 0), float(deg_xyz[1]))

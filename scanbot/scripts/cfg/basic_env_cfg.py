@@ -18,6 +18,7 @@ from isaaclab.sensors.frame_transformer.frame_transformer_cfg import FrameTransf
 from isaaclab.sim.spawners.from_files.from_files_cfg import GroundPlaneCfg, UsdFileCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
+from scanbot.scripts.utilities.pos_util import quat_wxyz_from_deg_xyz
 
 
 ##
@@ -38,7 +39,10 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     # Table
     table = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/Table",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.5, 0, 0], rot=[0.707, 0, 0, 0.707]),
+        init_state=AssetBaseCfg.InitialStateCfg(
+            pos=[0.5, 0, 0],
+            rot=tuple(quat_wxyz_from_deg_xyz((0.0, 0.0, 90.0))),
+        ),
         spawn=UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Mounts/SeattleLabTable/table_instanceable.usd"),
     )
 
@@ -178,7 +182,7 @@ class BasicEnvCfg(ManagerBasedRLEnvCfg):
 
     xr: XrCfg = XrCfg(
         anchor_pos=(-0.1, -0.5, -1.05),
-        anchor_rot=(0.866, 0, 0, -0.5),
+        anchor_rot=tuple(quat_wxyz_from_deg_xyz((0.0, 0.0, -60.0))),
     )
 
     def __post_init__(self):
