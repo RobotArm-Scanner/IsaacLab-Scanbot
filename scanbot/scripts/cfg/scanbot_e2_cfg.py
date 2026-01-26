@@ -68,12 +68,13 @@ class EventCfg:
 
 
 @configclass
-class ScanbotEnv2Cfg(BasicEnvCfg):
+class ScanbotE2Cfg(BasicEnvCfg):
     """Local copy of the Piper scanning env cfg (no gripper)."""
+    """E2 DEFAULT TEETH = T1"""
 
     def __post_init__(self):
         super().__post_init__()
-        self.env_name = "Scanbot-Piper-Env2"
+        self.env_name = "Scanbot-e2"
 
         # Set events
         self.events = EventCfg()
@@ -120,7 +121,7 @@ class ScanbotEnv2Cfg(BasicEnvCfg):
             "scanbot",
             "resources",
         )
-        my_usd_path = os.path.join(self.resources_root, "teeth_models", "model1", "Mouth_open_wo_tooth_root.usd")
+        my_usd_path = os.path.join(self.resources_root, "teeth", "t1", "Mouth_open_wo_tooth_root.usd")
 
         print(f"[DEBUG] usd_path (final str): {my_usd_path}")
 
@@ -386,12 +387,12 @@ class ScanbotEnv2Cfg(BasicEnvCfg):
 
 
 @configclass
-class ScanbotEnv2M1RT1Cfg(ScanbotEnv2Cfg):
-    """Scanbot env with model1 (more open) teeth rotated by 20 degrees around Y."""
+class ScanbotE2T1RT1Cfg(ScanbotE2Cfg):
+    """Scanbot env with t1 (more open) teeth rotated by 20 degrees around Y."""
 
     def __post_init__(self):
         super().__post_init__()
-        self.env_name = "Scanbot-Piper-Env2-M1RT1"
+        self.env_name = "Scanbot-Piper-e2.t1.rt1"
         self.events.init_piper_arm_pose.params["default_pose"] = [
             -0.155398,
             1.666897,
@@ -402,20 +403,20 @@ class ScanbotEnv2M1RT1Cfg(ScanbotEnv2Cfg):
         ]
         self.scene.teeth.spawn.usd_path = os.path.join(
             self.resources_root,
-            "teeth_models",
-            "model1",
+            "teeth",
+            "t1",
             "Mouth_more_open_wo_teeth_root.usd",
         )
         self.scene.teeth.init_state.rot = tuple(quat_wxyz_from_deg_xyz((0.0, 20.0, -90.0)))
 
 
 @configclass
-class ScanbotEnv2M2RT1Cfg(ScanbotEnv2Cfg):
-    """Scanbot env with model2 teeth rotated and offset to match 9000.usd."""
+class ScanbotE2T2RT1Cfg(ScanbotE2Cfg):
+    """Scanbot env with t2 teeth rotated and offset to match 9000.usd."""
 
     def __post_init__(self):
         super().__post_init__()
-        self.env_name = "Scanbot-Piper-Env2-M2RT1"
+        self.env_name = "Scanbot-Piper-e2.t2.rt1"
         self.events.init_piper_arm_pose.params["default_pose"] = [
             -0.128291,
             1.671921,
@@ -426,8 +427,8 @@ class ScanbotEnv2M2RT1Cfg(ScanbotEnv2Cfg):
         ]
         self.scene.teeth.spawn.usd_path = os.path.join(
             self.resources_root,
-            "teeth_models",
-            "model2",
+            "teeth",
+            "t2",
             "9000.usd",
         )
         self.scene.teeth.spawn.func = _spawn_rigid_object_from_usd

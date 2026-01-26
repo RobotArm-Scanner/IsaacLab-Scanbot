@@ -1,9 +1,9 @@
 import gymnasium as gym
 
 from scanbot.scripts.cfg.scanbot_e2_cfg import (
-    ScanbotEnv2Cfg,
-    ScanbotEnv2M1RT1Cfg,
-    ScanbotEnv2M2RT1Cfg,
+    ScanbotE2Cfg,
+    ScanbotE2T1RT1Cfg,
+    ScanbotE2T2RT1Cfg,
 )
 
 
@@ -12,25 +12,34 @@ gym.register(
     id="e2",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     kwargs={
-        "env_cfg_entry_point": ScanbotEnv2Cfg,
+        "env_cfg_entry_point": ScanbotE2Cfg,
     },
     disable_env_checker=True,
 )
 
 gym.register(
-    id="e2m1rt1",
+    id="e2.t1",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     kwargs={
-        "env_cfg_entry_point": ScanbotEnv2M1RT1Cfg,
+        "env_cfg_entry_point": ScanbotE2Cfg,
     },
     disable_env_checker=True,
 )
 
 gym.register(
-    id="e2m2rt1",
+    id="e2.t1.rt1",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     kwargs={
-        "env_cfg_entry_point": ScanbotEnv2M2RT1Cfg,
+        "env_cfg_entry_point": ScanbotE2T1RT1Cfg,
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="e2.t2.rt1",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": ScanbotE2T2RT1Cfg,
     },
     disable_env_checker=True,
 )
