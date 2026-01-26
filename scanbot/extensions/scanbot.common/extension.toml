@@ -1,0 +1,18 @@
+[package]
+title = "Scanbot Common"
+description = "Shared utilities for Scanbot extensions."
+version = "0.1.0"
+category = "robotics"
+authors = ["Scanbot"]
+
+[dependencies]
+"omni.kit.uiapp" = {}
+
+[core]
+reloadable = true
+
+[[python.module]]
+name = "scanbot.common"
+
+[scanbot]
+disabled = false

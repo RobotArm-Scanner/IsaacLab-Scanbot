@@ -1,0 +1,5 @@
+# Teleport robot TCP to target pose (base frame by default; set header.frame_id to "world" for world frame).
+geometry_msgs/PoseStamped target
+---
+bool success
+string message

@@ -17,6 +17,7 @@ tabs 4
 
 # get source directory
 export ISAACLAB_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+export PYTHONPATH="${ISAACLAB_PATH}:${PYTHONPATH}"
 
 #==
 # Helper functions

@@ -1,0 +1,8 @@
+# Query robot joint position limits (radians) in simulator joint order.
+---
+bool success
+string message
+string[] name
+float64[] lower
+float64[] upper
+

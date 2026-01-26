@@ -1,0 +1,18 @@
+[package]
+title = "Scanbot Exec Bridge"
+description = "HTTP bridge for executing code in the running Isaac Sim session."
+version = "0.1.0"
+category = "robotics"
+authors = ["Scanbot"]
+
+[dependencies]
+"omni.kit.uiapp" = {}
+
+[core]
+reloadable = true
+
+[[python.module]]
+name = "scanbot.exec_bridge"
+
+[scanbot]
+disabled = false

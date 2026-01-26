@@ -78,6 +78,8 @@ class ContainerInterface:
 
         # resolve the image extension through the passed yamls and envs
         self._resolve_image_extension(yamls, envs)
+        # keep track of extra env files passed by user to include for any profile
+        self.extra_envs = envs or []
         # load the environment variables from the .env files
         self._parse_dot_vars()
 
@@ -108,11 +110,15 @@ class ContainerInterface:
         result = subprocess.run(["docker", "image", "inspect", self.image_name], capture_output=True, text=True)
         return result.returncode == 0
 
-    def start(self):
-        """Build and start the Docker container using the Docker compose command."""
+    def start(self, skip_build: bool = False):
+        """Build and start the Docker container using the Docker compose command.
+
+        Args:
+            skip_build: If True, do not build images prior to starting the container.
+        """
+        action = "Starting" if skip_build else "Building and starting"
         print(
-            f"[INFO] Building the docker image and starting the container '{self.container_name}' in the"
-            " background...\n"
+            f"[INFO] {action} the container '{self.container_name}' in the background...\n"
         )
         # Check if the container history file exists
         container_history_file = self.context_dir / ".isaac-lab-docker-history"
@@ -120,35 +126,88 @@ class ContainerInterface:
             # Create the file with sticky bit on the group
             container_history_file.touch(mode=0o2644, exist_ok=True)
 
-        # build the image for the base profile if not running base (up will build base already if profile is base)
-        if self.profile != "base":
-            subprocess.run(
-                [
-                    "docker",
-                    "compose",
-                    "--file",
-                    "docker-compose.yaml",
-                    "--env-file",
-                    ".env.base",
-                    "build",
-                    "isaac-lab-base",
-                ],
-                check=False,
-                cwd=self.context_dir,
-                env=self.environ,
-            )
+        # build the image(s) for the base profile if not running base (unless skipped)
+        if not skip_build and self.profile != "base":
+            self.build(targets=["base"], no_cache=False)
 
         # build the image for the profile
+        up_args = ["up", "--detach", "--remove-orphans"]
+        if not skip_build:
+            up_args.insert(2, "--build")
         subprocess.run(
             ["docker", "compose"]
             + self.add_yamls
             + self.add_profiles
             + self.add_env_files
-            + ["up", "--detach", "--build", "--remove-orphans"],
+            + up_args,
             check=False,
             cwd=self.context_dir,
             env=self.environ,
         )
+
+    def build(self, targets: list[str] | None = None, no_cache: bool = False):
+        """Build selected images using Docker compose.
+
+        Args:
+            targets: List of profile names to build (e.g., base, ros2, scanbot). If None, defaults to
+                ["base"] when profile is "base", else ["base", profile].
+            no_cache: When True, build with --no-cache.
+        """
+        if not targets:
+            targets = ["base"] if self.profile == "base" else ["base", self.profile]
+
+        # Ensure deterministic order: build base first when included
+        if "base" in targets:
+            targets = ["base"] + [t for t in targets if t != "base"]
+
+        for target_profile in targets:
+            services = self._services_for_profile(target_profile)
+            if not services:
+                raise RuntimeError(f"No services found for profile '{target_profile}'.")
+            cmd = [
+                "docker",
+                "compose",
+                *self.add_yamls,
+                *self._env_files_args_for_profile(target_profile),
+                "--profile",
+                target_profile,
+                "build",
+            ]
+            if no_cache:
+                cmd.append("--no-cache")
+            cmd += services
+            subprocess.run(cmd, check=False, cwd=self.context_dir, env=self.environ)
+
+    def _env_files_args_for_profile(self, profile: str) -> list[str]:
+        args: list[str] = ["--env-file", ".env.base"]
+        env_profile = self.context_dir / f".env.{profile}"
+        if env_profile.exists():
+            args += ["--env-file", f".env.{profile}"]
+        for env in self.extra_envs:
+            args += ["--env-file", env]
+        return args
+
+    def _services_for_profile(self, profile: str) -> list[str]:
+        """Return list of service names for the given profile by querying compose config."""
+        result = subprocess.run(
+            [
+                "docker",
+                "compose",
+                *self.add_yamls,
+                *self._env_files_args_for_profile(profile),
+                "--profile",
+                profile,
+                "config",
+                "--services",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=self.context_dir,
+            env=self.environ,
+        )
+        services = [s.strip() for s in result.stdout.splitlines() if s.strip()]
+        return services
 
     def enter(self):
         """Enter the running container by executing a bash shell.

@@ -60,10 +60,15 @@ def parse_cli_args() -> argparse.Namespace:
 
     # Actual command definition begins here
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser(
+    start_cmd = subparsers.add_parser(
         "start",
         help="Build the docker image and create the container in detached mode.",
         parents=[parent_parser],
+    )
+    start_cmd.add_argument(
+        "--no-build",
+        action="store_true",
+        help="Do not build images; start the container only (fails if images are missing).",
     )
     subparsers.add_parser(
         "enter", help="Begin a new bash process within an existing Isaac Lab container.", parents=[parent_parser]
@@ -78,6 +83,27 @@ def parse_cli_args() -> argparse.Namespace:
     )
     config.add_argument(
         "--output-yaml", nargs="?", default=None, help="Yaml file to write config output to. Defaults to None."
+    )
+    build_cmd = subparsers.add_parser(
+        "build",
+        help=(
+            "Build one or more images. Defaults to building base + current profile when no --target is provided."
+        ),
+        parents=[parent_parser],
+    )
+    build_cmd.add_argument(
+        "--target",
+        dest="targets",
+        action="append",
+        help=(
+            "Profile(s) to build (e.g., base, ros2, scanbot). Can be repeated. "
+            "If omitted, builds base plus the selected profile."
+        ),
+    )
+    build_cmd.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Build without using cache (only for the selected targets).",
     )
     subparsers.add_parser(
         "copy", help="Copy build and logs artifacts from the container to the host machine.", parents=[parent_parser]
@@ -118,7 +144,13 @@ def main(args: argparse.Namespace):
             ci.add_yamls += x11_yaml
             ci.environ.update(x11_envar)
         # start the container
-        ci.start()
+        ci.start(skip_build=args.no_build)
+    elif args.command == "build":
+        # Determine default targets if not provided: base + profile (when profile != base), else just base
+        targets = args.targets
+        if not targets:
+            targets = ["base"] if ci.profile == "base" else ["base", ci.profile]
+        ci.build(targets=targets, no_cache=args.no_cache)
     elif args.command == "enter":
         # refresh the x11 forwarding
         x11_utils.x11_refresh(ci.statefile)

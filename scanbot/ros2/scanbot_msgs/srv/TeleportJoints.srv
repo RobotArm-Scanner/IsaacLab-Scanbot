@@ -1,0 +1,7 @@
+# Teleport joints to specified positions (radians).
+# If name is empty, positions are interpreted in simulator joint order.
+string[] name
+float64[] position
+---
+bool success
+string message

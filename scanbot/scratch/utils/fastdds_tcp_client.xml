@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <profiles>
+    <transport_descriptors>
+      <transport_descriptor>
+        <transport_id>tcp_client_transport</transport_id>
+        <type>TCPv4</type>
+        <listening_ports>
+          <port>61121</port>
+        </listening_ports>
+      </transport_descriptor>
+    </transport_descriptors>
+
+    <participant profile_name="tcp_client_participant" is_default_profile="true">
+      <rtps>
+        <userTransports>
+          <transport_id>tcp_client_transport</transport_id>
+        </userTransports>
+        <useBuiltinTransports>true</useBuiltinTransports>
+        <builtin>
+          <initialPeersList>
+            <locator>
+              <tcpv4>
+                <address>125.132.15.176</address>
+                <physical_port>61120</physical_port>
+              </tcpv4>
+            </locator>
+          </initialPeersList>
+        </builtin>
+      </rtps>
+    </participant>
+  </profiles>
+</dds>
