@@ -16,7 +16,7 @@ import os
 try:
     import pinocchio  # noqa: F401
 except Exception as exc:
-    print(f"[scanbot.basic_launcher] Pinocchio import skipped: {exc}")
+    print(f"[scanbot.scanbot_launcher] Pinocchio import skipped: {exc}")
 
 from isaaclab.app import AppLauncher
 

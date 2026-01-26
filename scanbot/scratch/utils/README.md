@@ -33,7 +33,7 @@ If a package is missing, try replacing `robostack-staging` with `robostack`.
 ### 2) Build `scanbot_msgs` on the host
 ```bash
 conda activate scanbot-ros2
-cd /mnt/ext_sda1/dev/IsaacLab-ScanBot/scanbot/ros2
+cd /mnt/ext_sda1/dev/IsaacLab-Scanbot/scanbot/ros2
 colcon build --packages-select scanbot_msgs
 source install/setup.bash
 ```
@@ -50,7 +50,7 @@ Use `send_target_tcp.py` after activating the conda env and sourcing the workspa
 
 ```bash
 conda activate scanbot-ros2
-cd /mnt/ext_sda1/dev/IsaacLab-ScanBot
+cd /mnt/ext_sda1/dev/IsaacLab-Scanbot
 source scanbot/ros2/install/setup.bash
 python scanbot/scratch/utils/send_target_tcp.py \
   --pose "0.40,0.00,0.20,0,0,0,1" \
@@ -63,7 +63,7 @@ red marker to `/scanbot/markers`.
 
 ```bash
 conda activate scanbot-ros2
-cd /mnt/ext_sda1/dev/IsaacLab-ScanBot
+cd /mnt/ext_sda1/dev/IsaacLab-Scanbot
 source scanbot/ros2/install/setup.bash
 python scanbot/scratch/utils/relay_scanpoint_marker.py \
   --scanpoint-topic /scanbot/scanpoint \

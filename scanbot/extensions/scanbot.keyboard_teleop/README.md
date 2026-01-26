@@ -11,4 +11,4 @@ WASDQE 키 입력으로 Piper를 조작하는 간단한 teleop 확장입니다. 
 
 사용:
 1) `--ext-folder scanbot/extensions`를 포함해 Isaac Lab을 실행하고 `scanbot.extension_manager` 또는 직접 `scanbot.keyboard_teleop`를 enable 합니다.
-2) `basic_launcher.py`를 통해 env를 띄운 뒤, 창 포커스를 유지한 채 WASDQE로 조작하면 됩니다. 입력이 없을 때는 0 액션으로 프레임을 진행합니다.***
+2) `scanbot_launcher.py`를 통해 env를 띄운 뒤, 창 포커스를 유지한 채 WASDQE로 조작하면 됩니다. 입력이 없을 때는 0 액션으로 프레임을 진행합니다.***

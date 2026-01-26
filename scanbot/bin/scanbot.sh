@@ -32,7 +32,7 @@ NUM_ENVS="${SCANBOT_NUM_ENVS:-1}"
 
 script -q -f -e -a \
   /workspace/isaaclab/scanbot/logs/isaaclab.log \
-  -c "bash -lc './isaaclab.sh -p scanbot/scripts/launchers/basic_launcher.py \
+  -c "bash -lc './isaaclab.sh -p scanbot/scripts/launchers/scanbot_launcher.py \
         --ext-folder scanbot/extensions \
         --enable_cameras \
         --num_envs ${NUM_ENVS} \

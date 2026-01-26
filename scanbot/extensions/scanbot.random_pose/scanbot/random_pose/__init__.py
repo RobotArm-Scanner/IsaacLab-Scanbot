@@ -55,7 +55,7 @@ class Extension(omni.ext.IExt):
     def _on_random_clicked(self) -> None:
         env = scanbot_context.get_env()
         if env is None:
-            self._set_status("Env not registered. Launch via basic_launcher.", error=True)
+            self._set_status("Env not registered. Launch via scanbot_launcher.", error=True)
             return
         self._pending_action = self._make_random_action(env, scale=1.0)
         if self._pending_action is None:

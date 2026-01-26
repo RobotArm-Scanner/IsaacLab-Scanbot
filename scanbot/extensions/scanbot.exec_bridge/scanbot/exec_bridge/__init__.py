@@ -113,7 +113,6 @@ class Extension(omni.ext.IExt):
         self._thread: threading.Thread | None = None
         self._exec_globals: dict[str, Any] = {"__name__": "__scanbot_exec__"}
 
-        self._enabled = False
         self._host = "127.0.0.1"
         self._port = 7311
         self._token = ""
@@ -130,10 +129,6 @@ class Extension(omni.ext.IExt):
 
     def on_startup(self, ext_id: str) -> None:
         self._ext_id = ext_id
-        self._enabled = str(os.getenv("SCANBOT_ENABLE_CODE_EXEC", "0")).lower() in {"1", "true", "yes"}
-        if not self._enabled:
-            carb.log_info("[scanbot.exec_bridge] Disabled (set SCANBOT_ENABLE_CODE_EXEC=1 to enable).")
-            return
 
         self._host = os.getenv("SCANBOT_EXEC_BRIDGE_HOST", "127.0.0.1")
         self._port = int(os.getenv("SCANBOT_EXEC_BRIDGE_PORT", "7311"))

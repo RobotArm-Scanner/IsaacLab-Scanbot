@@ -1,9 +1,9 @@
 import gymnasium as gym
 
-from scanbot.scripts.cfg.scanbot_cfg import ScanbotEnvCfg
+from scanbot.scripts.cfg.scanbot_e2_cfg import ScanbotEnv2Cfg
 
 
-class ScanbotSceneCfg(ScanbotEnvCfg):
+class ScanbotSceneCfg(ScanbotEnv2Cfg):
     """Alias config for the Piper scanning scene (no teleop; kept as-is)."""
 
     def __post_init__(self):

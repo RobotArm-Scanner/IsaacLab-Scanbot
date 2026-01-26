@@ -67,7 +67,7 @@ class EventCfg:
 
 
 @configclass
-class ScanbotEnvCfg(BasicEnvCfg):
+class ScanbotEnv2Cfg(BasicEnvCfg):
     """Local copy of the Piper scanning env cfg (no gripper)."""
 
     def __post_init__(self):
