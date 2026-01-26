@@ -72,6 +72,7 @@ class ScanbotEnv2Cfg(BasicEnvCfg):
 
     def __post_init__(self):
         super().__post_init__()
+        self.env_name = "Scanbot-Piper-Env2"
 
         # Set events
         self.events = EventCfg()
@@ -381,3 +382,13 @@ class ScanbotEnv2Cfg(BasicEnvCfg):
                 ),
             }
         )
+
+
+@configclass
+class ScanbotEnv2M1RT1Cfg(ScanbotEnv2Cfg):
+    """Scanbot env with model1 teeth rotated upward by 30 degrees."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.env_name = "Scanbot-Piper-Env2-M1RT1"
+        self.scene.teeth.init_state.rot = tuple(quat_wxyz_from_deg_xyz((0.0, 30.0, -90.0)))

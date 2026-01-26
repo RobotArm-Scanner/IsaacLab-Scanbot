@@ -29,12 +29,14 @@ if [ -n "${PHYSX_GPU}" ]; then
 fi
 KIT_ARGS="--/renderer/multiGpu/enabled=${MULTI_GPU_ENABLED} --/renderer/multiGpu/autoEnable=${MULTI_GPU_AUTO} --/renderer/multiGpu/maxGpuCount=${MULTI_GPU_MAX} ${ACTIVE_GPU_ARG} ${PHYSX_GPU_ARG} --/app/renderer/waitIdle=false --/app/hydraEngine/waitIdle=false --/app/updateOrder/checkForHydraRenderComplete=0 --enable omni.usd.metrics.assembler"
 NUM_ENVS="${SCANBOT_NUM_ENVS:-1}"
+TASK_ID="${SCANBOT_TASK:-e2}"
 
 script -q -f -e -a \
   /workspace/isaaclab/scanbot/logs/isaaclab.log \
   -c "bash -lc './isaaclab.sh -p scanbot/scripts/launchers/scanbot_launcher.py \
         --ext-folder scanbot/extensions \
         --enable_cameras \
+        --task ${TASK_ID} \
         --num_envs ${NUM_ENVS} \
         ${DEVICE_ARG} \
         ${HEADLESS_ARG} \

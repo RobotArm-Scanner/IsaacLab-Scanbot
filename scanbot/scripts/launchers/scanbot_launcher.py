@@ -28,7 +28,7 @@ parser.add_argument("--num_envs", type=int, default=1, help="Number of environme
 parser.add_argument(
     "--task",
     type=str,
-    default="Scanbot-Piper-Scene-v0",
+    default="e2",
     help="Gym task id to load (keeps the original objects).",
 )
 parser.add_argument(
