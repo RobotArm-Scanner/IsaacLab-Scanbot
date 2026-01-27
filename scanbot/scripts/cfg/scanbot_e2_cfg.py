@@ -504,6 +504,9 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
         self.xr.anchor_rotation_custom_func = None
         self.teleop_devices = None
 
+        # Drop global camera for RL (avoid per-env extra sensors)
+        self.scene.global_camera = None
+
         # Depth-only camera for coverage (avoid image obs during init)
         self.scene.wrist_camera.data_types = ["distance_to_image_plane"]
         self.scene.wrist_camera.update_period = 0.1

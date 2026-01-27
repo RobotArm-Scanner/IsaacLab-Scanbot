@@ -75,3 +75,11 @@
 
 **Fix**
 - In RL config, set `xr.anchor_rotation_custom_func = None` and disable `teleop_devices`.
+
+## RL training: PhysX GPU kernel failures at high env counts
+**Symptoms**
+- Logs show `PhysX error: ... fail to launch kernel` and `PhysX has reported too many errors, simulation has been stopped.`
+
+**Fix**
+- Reduce `--num_envs` (env8 failed in our bench; env1-4 were stable).
+- Consider lowering render/camera load or disabling extra sensors.

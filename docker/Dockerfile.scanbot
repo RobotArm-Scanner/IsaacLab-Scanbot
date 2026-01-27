@@ -68,7 +68,7 @@ RUN chmod +x /usr/local/bin/setup_scanbot_msgs.sh && \
 
 # Install custom dependency
 RUN apt-get update && apt-get install -y --no-install-recommends nano vim
-RUN ${ISAACLAB_PATH}/isaaclab.sh -p -m pip install open3d==0.18.0
+RUN ${ISAACLAB_PATH}/isaaclab.sh -p -m pip install open3d==0.18.0 scipy
 
 # Optionally install VNC/XFCE; controlled by USE_VNC build arg
 RUN --mount=type=cache,target=/var/cache/apt \
