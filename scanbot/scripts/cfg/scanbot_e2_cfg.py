@@ -17,6 +17,7 @@ from isaaclab.devices.openxr.retargeters.manipulator.gripper_retargeter import G
 from isaaclab.devices.openxr.retargeters.manipulator.se3_rel_retargeter import Se3RelRetargeterCfg
 from isaaclab.envs.mdp.actions.actions_cfg import DifferentialInverseKinematicsActionCfg
 from isaaclab.managers import EventTermCfg as EventTerm
+from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import SceneEntityCfg
 ##
 # Pre-defined configs
@@ -454,3 +455,45 @@ class ScanbotE2T3DSCfg(ScanbotE2Cfg):
         # self.scene.teeth.spawn.asset_offset = (0.58646, -0.00021, -0.49428)
         self.scene.teeth.init_state.pos = (0.565, -0.00021, 0.28)
         self.scene.teeth.init_state.rot = tuple(quat_wxyz_from_deg_xyz((0.0, 0.0, -90.0)))
+
+
+@configclass
+class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
+    """Scanbot RL env config for t3ds (vision + proprio)."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.env_name = "Scanbot-Piper-e2.t3ds.rl"
+
+        # RL-friendly defaults (vision costs)
+        self.scene.num_envs = 128
+        self.sim.render_interval = 1
+
+        # Observation: do not include action history
+        self.observations.policy.actions = None
+
+        # Add wrist camera observations (rgb + depth)
+        self.observations.policy.wrist_rgb = ObsTerm(
+            func=mdp.image,
+            params={"sensor_cfg": SceneEntityCfg("wrist_camera"), "data_type": "rgb", "normalize": False},
+        )
+        self.observations.policy.wrist_depth = ObsTerm(
+            func=mdp.image,
+            params={
+                "sensor_cfg": SceneEntityCfg("wrist_camera"),
+                "data_type": "distance_to_image_plane",
+                "normalize": False,
+            },
+        )
+
+        # Downscale cameras for RL throughput
+        self.scene.wrist_camera.update_period = 0.0
+        self.scene.wrist_camera.height = 128
+        self.scene.wrist_camera.width = 128
+
+        self.scene.global_camera.update_period = 0.5
+        self.scene.global_camera.height = 256
+        self.scene.global_camera.width = 256
+
+        # List of image observations used by the policy
+        self.image_obs_list = ["wrist_camera"]
