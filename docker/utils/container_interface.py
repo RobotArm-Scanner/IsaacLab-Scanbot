@@ -17,6 +17,23 @@ from .state_file import StateFile
 class ContainerInterface:
     """A helper class for managing Isaac Lab containers."""
 
+    @staticmethod
+    def _strip_quotes(value: str) -> str:
+        value = value.strip()
+        if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+            value = value[1:-1].strip()
+        return value
+
+    @staticmethod
+    def _normalize_suffix(value: str) -> str:
+        """Normalize a suffix to either "" or a string starting with "-"."""
+        value = ContainerInterface._strip_quotes(value)
+        if not value:
+            return ""
+        if value.startswith("-"):
+            return value
+        return f"-{value}"
+
     def __init__(
         self,
         context_dir: Path,
@@ -38,9 +55,9 @@ class ContainerInterface:
             statefile: An instance of the :class:`Statefile` class to manage state variables. Defaults to None, in
                 which case a new configuration object is created by reading the configuration file at the path
                 ``context_dir/.container.cfg``.
-            suffix: Optional docker image and container name suffix.  Defaults to None, in which case, the docker name
-                suffix is set to the empty string. A hyphen is inserted in between the profile and the suffix if
-                the suffix is a nonempty string.  For example, if "base" is passed to profile, and "custom" is
+            suffix: Optional docker image and container name suffix. Defaults to None, in which case the suffix is
+                loaded from the composed env files (``DOCKER_NAME_SUFFIX``) and falls back to the empty string. A
+                leading hyphen is inserted if missing. For example, if "base" is passed to profile, and "custom" is
                 passed to suffix, then the produced docker image and container will be named ``isaac-lab-base-custom``.
         """
         # set the context directory
@@ -60,13 +77,28 @@ class ContainerInterface:
             # but not a real profile
             self.profile = "base"
 
-        # set the docker image and container name suffix
-        if suffix is None or suffix == "":
-            # if no name suffix is given, default to the empty string as the name suffix
-            self.suffix = ""
+        # keep track of extra env files passed by user to include for any profile
+        self.extra_envs = envs or []
+
+        # resolve the image extension through the passed yamls and envs
+        self._resolve_image_extension(yamls, envs)
+        # load the environment variables from the .env files
+        self._parse_dot_vars()
+
+        # set the docker image and container name suffix:
+        # - CLI --suffix wins (expects "dev", becomes "-dev")
+        # - otherwise, if PROJECT_SUFFIX is defined in env files, derive suffix from it
+        # - otherwise, fall back to DOCKER_NAME_SUFFIX from env files (accepts "-dev" or "dev")
+        if suffix is not None and suffix != "":
+            self.suffix = self._normalize_suffix(suffix)
+        elif "PROJECT_SUFFIX" in self.dot_vars:
+            project_suffix = self._strip_quotes(str(self.dot_vars.get("PROJECT_SUFFIX", "")))
+            if project_suffix.startswith("-"):
+                project_suffix = project_suffix[1:]
+            self.suffix = f"-{project_suffix}" if project_suffix else ""
         else:
-            # insert a hyphen before the suffix if a suffix is given
-            self.suffix = f"-{suffix}"
+            env_suffix = str(self.dot_vars.get("DOCKER_NAME_SUFFIX", ""))
+            self.suffix = self._normalize_suffix(env_suffix)
 
         self.container_name = f"isaac-lab-{self.profile}{self.suffix}"
         self.image_name = f"isaac-lab-{self.profile}{self.suffix}:latest"
@@ -75,13 +107,6 @@ class ContainerInterface:
         # except make sure that the docker name suffix is set from the script
         self.environ = os.environ.copy()
         self.environ["DOCKER_NAME_SUFFIX"] = self.suffix
-
-        # resolve the image extension through the passed yamls and envs
-        self._resolve_image_extension(yamls, envs)
-        # keep track of extra env files passed by user to include for any profile
-        self.extra_envs = envs or []
-        # load the environment variables from the .env files
-        self._parse_dot_vars()
 
     """
     Operations.

@@ -52,9 +52,10 @@ def parse_cli_args() -> argparse.Namespace:
         default=None,
         help=(
             "Optional docker image and container name suffix.  Defaults to None, in which case, the docker name"
-            " suffix is set to the empty string. A hyphen is inserted in between the profile and the suffix if"
-            ' the suffix is a nonempty string.  For example, if "base" is passed to profile, and "custom" is'
-            " passed to suffix, then the produced docker image and container will be named ``isaac-lab-base-custom``."
+            " suffix is loaded from the composed env files (``DOCKER_NAME_SUFFIX``) and falls back to the empty"
+            " string. A hyphen is inserted in between the profile and the suffix if the suffix is a nonempty string."
+            ' For example, if "base" is passed to profile, and "custom" is passed to suffix, then the produced'
+            " docker image and container will be named ``isaac-lab-base-custom``."
         ),
     )
 
