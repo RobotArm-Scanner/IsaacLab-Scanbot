@@ -60,6 +60,7 @@ gym.register(
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     kwargs={
         "env_cfg_entry_point": ScanbotE2RLT3DSCfg,
+        "rsl_rl_cfg_entry_point": "scanbot.scripts.rl.rsl_rl_ppo_cfg:ScanbotE2T3DSRLPPORunnerCfg",
     },
     disable_env_checker=True,
 )

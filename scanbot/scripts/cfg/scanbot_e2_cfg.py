@@ -18,6 +18,7 @@ from isaaclab.devices.openxr.retargeters.manipulator.se3_rel_retargeter import S
 from isaaclab.envs.mdp.actions.actions_cfg import DifferentialInverseKinematicsActionCfg
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationTermCfg as ObsTerm
+from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 ##
 # Pre-defined configs
@@ -31,11 +32,12 @@ from isaaclab.sim.schemas.schemas_cfg import CollisionPropertiesCfg, RigidBodyPr
 from isaaclab.sim.spawners.from_files.from_files_cfg import UsdFileCfg
 from isaaclab.utils import configclass
 from isaaclab_tasks.manager_based.manipulation.stack import mdp
+from scanbot.scripts import scanbot_mdp
 from scanbot.scripts.utilities.pos_util import quat_wxyz_from_deg_xyz
 from scanbot.scripts.utilities.teeth3ds_util import ensure_t3ds_usd
 from scanbot.scripts.utilities.usd_util import spawn_usd_with_mesh_collision, spawn_rigid_object_from_usd
 from scanbot.scripts.robots import piper_scanning_events
-from scanbot.scripts.cfg.basic_env_cfg import BasicEnvCfg
+from scanbot.scripts.cfg.basic_env_cfg import BasicEnvCfg, ObservationsCfg
 from scanbot.scripts.robots.piper_no_gripper import PIPER_NO_GRIPPER_CFG
 
 
@@ -67,6 +69,29 @@ class EventCfg:
             "asset_cfg": SceneEntityCfg("robot"),
         },
     )
+
+
+@configclass
+class RewardsCfg:
+    """Reward terms for Scanbot RL."""
+
+    ee_delta = RewTerm(func=scanbot_mdp.ee_delta_l2, weight=-0.05, params={"ee_frame_cfg": SceneEntityCfg("ee_frame")})
+    coverage_delta = RewTerm(func=scanbot_mdp.coverage_delta_reward, weight=5.0, params={})
+    per_tooth_bonus = RewTerm(func=scanbot_mdp.per_tooth_coverage_bonus, weight=2.0, params={})
+    total_bonus = RewTerm(func=scanbot_mdp.total_coverage_bonus, weight=10.0, params={})
+
+
+@configclass
+class ScanbotRLObservationsCfg(ObservationsCfg):
+    """Observation config tuned for RL (flat 1D)."""
+
+    @configclass
+    class PolicyCfg(ObservationsCfg.PolicyCfg):
+        def __post_init__(self):
+            super().__post_init__()
+            self.concatenate_terms = True
+
+    policy: PolicyCfg = PolicyCfg()
 
 
 @configclass
@@ -448,7 +473,8 @@ class ScanbotE2T3DSCfg(ScanbotE2Cfg):
     def __post_init__(self):
         super().__post_init__()
         self.env_name = "Scanbot-Piper-e2.t3ds"
-        self.scene.teeth.spawn.usd_path = ensure_t3ds_usd(self.resources_root)
+        self.teeth_dataset_id = "A9TECAGP"
+        self.scene.teeth.spawn.usd_path = ensure_t3ds_usd(self.resources_root, dataset_id=self.teeth_dataset_id)
         self.scene.teeth.spawn.func = spawn_usd_with_mesh_collision
         self.scene.teeth.spawn.scale = (0.0015, 0.0015, 0.0015)
         # Center the raw mesh bounds around the asset origin (world units, before scale is applied).
@@ -465,35 +491,54 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
         super().__post_init__()
         self.env_name = "Scanbot-Piper-e2.t3ds.rl"
 
-        # RL-friendly defaults (vision costs)
-        self.scene.num_envs = 128
+        # RL-friendly defaults
+        self.scene.num_envs = 4
         self.sim.render_interval = 1
+        self.episode_length_s = 90.0
 
         # Observation: do not include action history
+        self.observations = ScanbotRLObservationsCfg()
         self.observations.policy.actions = None
 
-        # Add wrist camera observations (rgb + depth)
-        self.observations.policy.wrist_rgb = ObsTerm(
-            func=mdp.image,
-            params={"sensor_cfg": SceneEntityCfg("wrist_camera"), "data_type": "rgb", "normalize": False},
-        )
-        self.observations.policy.wrist_depth = ObsTerm(
-            func=mdp.image,
-            params={
-                "sensor_cfg": SceneEntityCfg("wrist_camera"),
-                "data_type": "distance_to_image_plane",
-                "normalize": False,
-            },
-        )
+        # Disable XR callbacks for Hydra serialization
+        self.xr.anchor_rotation_custom_func = None
+        self.teleop_devices = None
 
-        # Downscale cameras for RL throughput
-        self.scene.wrist_camera.update_period = 0.0
+        # Depth-only camera for coverage (avoid image obs during init)
+        self.scene.wrist_camera.data_types = ["distance_to_image_plane"]
+        self.scene.wrist_camera.update_period = 0.1
         self.scene.wrist_camera.height = 128
         self.scene.wrist_camera.width = 128
 
-        self.scene.global_camera.update_period = 0.5
-        self.scene.global_camera.height = 256
-        self.scene.global_camera.width = 256
+        # Disable image observations for now (stability first)
+        self.image_obs_list = []
 
-        # List of image observations used by the policy
-        self.image_obs_list = ["wrist_camera"]
+        # Rewards
+        self.rewards = RewardsCfg()
+
+        self.coverage_threshold_tooth = 0.8
+        self.coverage_threshold_total = 0.8
+        self.coverage_params = {
+            "resources_root": self.resources_root,
+            "dataset_id": self.teeth_dataset_id,
+            "num_samples": 20000,
+            "seed": 0,
+            "gum_assign_radius": 0.002,
+            "coverage_radius": 0.002,
+            "scale": self.scene.teeth.spawn.scale,
+            "pcd_voxel_size": 0.001,
+            "pcd_max_points": 60000,
+            "coverage_update_every": 2,
+            "camera_name": "wrist_camera",
+            "data_type": "distance_to_image_plane",
+            "teeth_name": "teeth",
+        }
+        self.rewards.coverage_delta.params = dict(self.coverage_params)
+        self.rewards.per_tooth_bonus.params = dict(
+            self.coverage_params,
+            threshold=self.coverage_threshold_tooth,
+        )
+        self.rewards.total_bonus.params = dict(
+            self.coverage_params,
+            threshold=self.coverage_threshold_total,
+        )

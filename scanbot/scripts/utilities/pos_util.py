@@ -94,7 +94,7 @@ def _compose_offsets(
     return pos, quat
 
 
-def quat_wxyz_from_deg_xyz(deg_xyz) -> np.ndarray:
+def quat_wxyz_from_deg_xyz(deg_xyz) -> tuple[float, float, float, float]:
     """Euler deg -> quat (WXYZ), applied as Z * Y * X to match existing convention."""
     r = (
         Gf.Rotation(Gf.Vec3d(0, 0, 1), float(deg_xyz[2]))
@@ -102,7 +102,7 @@ def quat_wxyz_from_deg_xyz(deg_xyz) -> np.ndarray:
         * Gf.Rotation(Gf.Vec3d(1, 0, 0), float(deg_xyz[0]))
     )
     q = r.GetQuat()
-    return np.array([float(q.GetReal()), *map(float, q.GetImaginary())], dtype=float)
+    return (float(q.GetReal()), *map(float, q.GetImaginary()))
 
 
 # Offsets are configured at runtime from the active environment.
