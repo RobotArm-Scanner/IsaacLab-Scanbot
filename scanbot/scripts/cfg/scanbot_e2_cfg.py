@@ -32,7 +32,7 @@ from isaaclab.utils import configclass
 from isaaclab_tasks.manager_based.manipulation.stack import mdp
 from scanbot.scripts.utilities.pos_util import quat_wxyz_from_deg_xyz
 from scanbot.scripts.utilities.teeth3ds_util import ensure_t3ds_usd
-from scanbot.scripts.utilities.usd_util import _spawn_rigid_object_from_usd
+from scanbot.scripts.utilities.usd_util import spawn_usd_with_mesh_collision, spawn_rigid_object_from_usd
 from scanbot.scripts.robots import piper_scanning_events
 from scanbot.scripts.cfg.basic_env_cfg import BasicEnvCfg
 from scanbot.scripts.robots.piper_no_gripper import PIPER_NO_GRIPPER_CFG
@@ -432,7 +432,7 @@ class ScanbotE2T2RT1Cfg(ScanbotE2Cfg):
             "t2",
             "9000.usd",
         )
-        self.scene.teeth.spawn.func = _spawn_rigid_object_from_usd
+        self.scene.teeth.spawn.func = spawn_rigid_object_from_usd
         self.scene.teeth.spawn.scale = (0.11, 0.11, 0.11)
         self.scene.teeth.spawn.asset_offset = (0.09785, 0.328884, 0.456378)
         self.scene.teeth.spawn.asset_orient_deg = (24.946, 0.613, 4.665)
@@ -448,7 +448,7 @@ class ScanbotE2T3DSCfg(ScanbotE2Cfg):
         super().__post_init__()
         self.env_name = "Scanbot-Piper-e2.t3ds"
         self.scene.teeth.spawn.usd_path = ensure_t3ds_usd(self.resources_root)
-        self.scene.teeth.spawn.func = _spawn_rigid_object_from_usd
+        self.scene.teeth.spawn.func = spawn_usd_with_mesh_collision
         self.scene.teeth.spawn.scale = (0.0015, 0.0015, 0.0015)
         # Center the raw mesh bounds around the asset origin (world units, before scale is applied).
         # self.scene.teeth.spawn.asset_offset = (0.58646, -0.00021, -0.49428)
