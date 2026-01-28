@@ -55,14 +55,17 @@ class _CoverageState:
             raise KeyError(f"Camera output '{self.data_type}' not available for {self.camera_name}")
         depth = camera.data.output[self.data_type]
         intrinsics = camera.data.intrinsic_matrices
-        cam_pos = camera.data.pos_w
-        cam_quat = camera.data.quat_w_world
+        num_envs = env.num_envs
+        cam_pos, cam_quat_opengl = camera._view.get_world_poses()
+        cam_pos = cam_pos.to(depth.device)
+        cam_quat = math_utils.convert_camera_frame_orientation_convention(
+            cam_quat_opengl.to(depth.device), origin="opengl", target="ros"
+        )
 
         teeth = env.scene[self.teeth_name]
         teeth_pos = teeth.data.root_pos_w
         teeth_quat = teeth.data.root_quat_w
 
-        num_envs = env.num_envs
         for env_id in range(num_envs):
             step = int(step_buf[env_id].item())
             if self.update_every > 1 and step % self.update_every != 0:
@@ -234,7 +237,8 @@ def coverage_delta_reward(
             continue
         teeth_all = metrics["teeth"]["all"]["coverage"]
         teeth_gum_all = metrics["teeth_gum"]["all"]["coverage"]
-        coverage_sum[env_id] = float(teeth_all + teeth_gum_all)
+        gum_all = metrics["gum"]["coverage"]
+        coverage_sum[env_id] = float(teeth_all + teeth_gum_all + gum_all)
 
     delta = coverage_sum - state.last_coverage_sum
     state.last_coverage_sum = coverage_sum

@@ -235,6 +235,7 @@ class ScanbotE2Cfg(BasicEnvCfg):
             offset=CameraCfg.OffsetCfg(
                 pos=(-1.71854, -7.51282, -260.88225),
                 rot=tuple(quat_wxyz_from_deg_xyz((90.0, 0.0, 0.0))),
+                convention="ros",
             ),
         )
 
@@ -504,11 +505,11 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
         self.xr.anchor_rotation_custom_func = None
         self.teleop_devices = None
 
-        # Drop global camera for RL (avoid per-env extra sensors)
+        # Drop global camera for RL (avoid per-env extra sensors).
         self.scene.global_camera = None
 
-        # Depth-only camera for coverage (avoid image obs during init)
-        self.scene.wrist_camera.data_types = ["distance_to_image_plane"]
+        # Depth + RGB camera for coverage and visualization
+        self.scene.wrist_camera.data_types = ["rgb", "distance_to_image_plane"]
         self.scene.wrist_camera.update_period = 0.1
         self.scene.wrist_camera.height = 128
         self.scene.wrist_camera.width = 128
