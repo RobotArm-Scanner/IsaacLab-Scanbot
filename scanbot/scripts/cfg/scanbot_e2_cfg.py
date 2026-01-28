@@ -19,6 +19,7 @@ from isaaclab.envs.mdp.actions.actions_cfg import DifferentialInverseKinematicsA
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
+from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.managers import SceneEntityCfg
 ##
 # Pre-defined configs
@@ -495,7 +496,7 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
         # RL-friendly defaults
         self.scene.num_envs = 4
         self.sim.render_interval = 1
-        self.episode_length_s = 90.0
+        self.episode_length_s = 20.0
 
         # Observation: do not include action history
         self.observations = ScanbotRLObservationsCfg()
@@ -519,6 +520,16 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
 
         # Rewards
         self.rewards = RewardsCfg()
+
+        # Terminations (failure conditions)
+        self.terminations.scanpoint_far_from_support = DoneTerm(
+            func=scanbot_mdp.scanpoint_far_from_support,
+            params={
+                "max_distance": 0.3,
+                "camera_name": "wrist_camera",
+                "support_name": "teeth_support",
+            },
+        )
 
         self.coverage_threshold_tooth = 0.8
         self.coverage_threshold_total = 0.8
