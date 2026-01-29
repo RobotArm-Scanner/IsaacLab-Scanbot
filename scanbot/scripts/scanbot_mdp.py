@@ -198,13 +198,148 @@ def _get_coverage_plot_state(env, key: tuple) -> dict:
         state = {
             "key": key,
             "fig": None,
-            "axes": None,
+            "axes_left": None,
+            "axes_right": None,
             "lines": None,
+            "summary_lines": None,
             "history": None,
         }
         env._scanbot_coverage_plot_state = state
     return state
 
+
+def _get_tcp_traj_plot_state(env, key: tuple) -> dict:
+    state = getattr(env, "_scanbot_tcp_traj_plot_state", None)
+    if state is None or state.get("key") != key:
+        state = {
+            "key": key,
+            "fig": None,
+            "axes": None,
+            "lines": None,
+            "history": None,
+            "last_episode_step": None,
+        }
+        env._scanbot_tcp_traj_plot_state = state
+    return state
+
+
+def _update_tcp_traj_plot(
+    env,
+    frame_name: str = "ee_frame",
+    update_interval: int = 1,
+    max_points: int = 500,
+    pause: float = 0.001,
+    env_ids: list[int] | None = None,
+) -> None:
+    step = getattr(env, "common_step_counter", 0)
+    interval = int(update_interval) if update_interval else 1
+    if interval > 1 and step % interval != 0:
+        return
+
+    if env_ids is None:
+        env_ids = list(range(env.num_envs))
+
+    if not env_ids:
+        return
+
+    import matplotlib
+    import matplotlib.pyplot as plt
+    from collections import deque
+
+    key = (tuple(env_ids), frame_name, int(max_points))
+    state = _get_tcp_traj_plot_state(env, key)
+    fig = state.get("fig")
+    axes = state.get("axes")
+    if fig is None or not plt.fignum_exists(fig.number):
+        plt.ion()
+        plt.rcParams["figure.raise_window"] = False
+        fig, axes = plt.subplots(
+            len(env_ids),
+            1,
+            sharex=False,
+            subplot_kw={"projection": "3d"},
+            figsize=(8, 3 * len(env_ids)),
+        )
+        if len(env_ids) == 1:
+            axes = [axes]
+        fig.canvas.manager.set_window_title("Scanbot TCP Trajectory")
+
+        lines: dict[int, object] = {}
+        history: dict[int, dict[str, object]] = {}
+        last_episode_step: dict[int, int] = {}
+        for ax, env_id in zip(axes, env_ids):
+            ax.set_title(f"env {env_id}")
+            ax.set_xlabel("x")
+            ax.set_ylabel("y")
+            ax.set_zlabel("z")
+            ax.grid(True, alpha=0.3)
+            line, = ax.plot([], [], [], label="tcp")
+            lines[env_id] = line
+            history[env_id] = {
+                "x": deque(maxlen=max_points),
+                "y": deque(maxlen=max_points),
+                "z": deque(maxlen=max_points),
+            }
+            last_episode_step[env_id] = -1
+        state["fig"] = fig
+        state["axes"] = axes
+        state["lines"] = lines
+        state["history"] = history
+        state["last_episode_step"] = last_episode_step
+
+        # Prevent the plot window from stealing focus in Qt.
+        if "Qt" in str(matplotlib.get_backend()):
+            from matplotlib.backends.qt_compat import QtCore
+
+            window = fig.canvas.manager.window
+            window.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
+            window.setWindowFlag(QtCore.Qt.Tool, True)
+            window.setFocusPolicy(QtCore.Qt.NoFocus)
+            window.show()
+
+    frame = env.scene[frame_name]
+    tcp_pos = frame.data.target_pos_w[:, 0, :] - env.scene.env_origins[:, 0:3]
+    tcp_np = tcp_pos.detach().cpu().numpy()
+
+    lines = state["lines"]
+    history = state["history"]
+    axes = state["axes"]
+    last_episode_step = state.get("last_episode_step", {})
+
+    for ax, env_id in zip(axes, env_ids):
+        episode_step = int(env.episode_length_buf[env_id].item())
+        prev_step = int(last_episode_step.get(env_id, -1))
+        if episode_step <= 1 or episode_step < prev_step:
+            env_hist = history[env_id]
+            env_hist["x"].clear()
+            env_hist["y"].clear()
+            env_hist["z"].clear()
+            line = lines[env_id]
+            line.set_data([], [])
+            line.set_3d_properties([])
+        last_episode_step[env_id] = episode_step
+
+        pos = tcp_np[env_id]
+        env_hist = history[env_id]
+        env_hist["x"].append(float(pos[0]))
+        env_hist["y"].append(float(pos[1]))
+        env_hist["z"].append(float(pos[2]))
+        line = lines[env_id]
+        line.set_data(env_hist["x"], env_hist["y"])
+        line.set_3d_properties(env_hist["z"])
+
+        xs = np.asarray(env_hist["x"], dtype=float)
+        ys = np.asarray(env_hist["y"], dtype=float)
+        zs = np.asarray(env_hist["z"], dtype=float)
+        if xs.size:
+            pad = 0.01
+            ax.set_xlim(xs.min() - pad, xs.max() + pad)
+            ax.set_ylim(ys.min() - pad, ys.max() + pad)
+            ax.set_zlim(zs.min() - pad, zs.max() + pad)
+
+    fig.canvas.draw_idle()
+    fig.canvas.flush_events()
+    plt.pause(pause)
 
 def _update_coverage_plot(
     env,
@@ -214,6 +349,7 @@ def _update_coverage_plot(
     pause: float = 0.001,
     env_ids: list[int] | None = None,
     show_legend: bool = False,
+    show_summary: bool = True,
 ) -> None:
     step = getattr(env, "common_step_counter", 0)
     interval = int(update_interval) if update_interval else 1
@@ -227,7 +363,7 @@ def _update_coverage_plot(
         return
 
     tooth_ids = [str(int(tid)) for tid in state.tracker.surface.tooth_ids]
-    key = (tuple(env_ids), tuple(tooth_ids), int(max_points), bool(show_legend))
+    key = (tuple(env_ids), tuple(tooth_ids), int(max_points), bool(show_legend), bool(show_summary))
 
     import matplotlib
     import matplotlib.pyplot as plt
@@ -235,36 +371,65 @@ def _update_coverage_plot(
 
     plot_state = _get_coverage_plot_state(env, key)
     fig = plot_state.get("fig")
-    axes = plot_state.get("axes")
+    axes_left = plot_state.get("axes_left")
+    axes_right = plot_state.get("axes_right")
     if fig is None or not plt.fignum_exists(fig.number):
         plt.ion()
         plt.rcParams["figure.raise_window"] = False
-        fig, axes = plt.subplots(len(env_ids), 1, sharex=True, figsize=(10, 3 * len(env_ids)))
-        if len(env_ids) == 1:
-            axes = [axes]
+        if show_summary:
+            fig, axes = plt.subplots(
+                len(env_ids),
+                2,
+                sharex=True,
+                figsize=(12, 3 * len(env_ids)),
+            )
+            axes = np.asarray(axes)
+            if axes.ndim == 1:
+                axes = axes.reshape(1, 2)
+            axes_left = [axes[i][0] for i in range(len(env_ids))]
+            axes_right = [axes[i][1] for i in range(len(env_ids))]
+        else:
+            fig, axes = plt.subplots(len(env_ids), 1, sharex=True, figsize=(10, 3 * len(env_ids)))
+            if len(env_ids) == 1:
+                axes = [axes]
+            axes_left = list(axes)
+            axes_right = None
         fig.canvas.manager.set_window_title("Scanbot Coverage per Tooth")
 
         lines: dict[int, dict[str, object]] = {}
+        summary_lines: dict[int, object] | None = {} if show_summary else None
         history: dict[int, dict[str, object]] = {}
-        for ax, env_id in zip(axes, env_ids):
-            ax.set_ylabel(f"env {env_id}")
-            ax.set_ylim(0.0, 1.0)
-            ax.grid(True, alpha=0.3)
+        for row, env_id in enumerate(env_ids):
+            left_ax = axes_left[row]
+            left_ax.set_ylabel(f"env {env_id}")
+            left_ax.set_ylim(0.0, 1.0)
+            left_ax.grid(True, alpha=0.3)
             env_lines: dict[str, object] = {}
-            env_hist: dict[str, object] = {"t": deque(maxlen=max_points), "y": {}}
+            env_hist: dict[str, object] = {"t": deque(maxlen=max_points), "y": {}, "teeth_all": deque(maxlen=max_points)}
             for tooth_id in tooth_ids:
-                line, = ax.plot([], [], label=tooth_id)
+                line, = left_ax.plot([], [], label=tooth_id)
                 env_lines[tooth_id] = line
                 env_hist["y"][tooth_id] = deque(maxlen=max_points)
             if show_legend:
-                ax.legend(loc="upper right", ncol=4, fontsize="x-small")
+                left_ax.legend(loc="upper right", ncol=4, fontsize="x-small")
             lines[env_id] = env_lines
             history[env_id] = env_hist
-        axes[-1].set_xlabel("step")
+            if show_summary and axes_right is not None:
+                right_ax = axes_right[row]
+                right_ax.set_ylabel("teeth/all")
+                right_ax.set_ylim(0.0, 1.0)
+                right_ax.grid(True, alpha=0.3)
+                summary_line, = right_ax.plot([], [], label="teeth/all")
+                summary_lines[env_id] = summary_line
+        axes_left[-1].set_xlabel("step")
+        if show_summary and axes_right is not None:
+            axes_right[-1].set_xlabel("step")
 
         plot_state["fig"] = fig
-        plot_state["axes"] = axes
+        plot_state["axes_left"] = axes_left
+        plot_state["axes_right"] = axes_right
         plot_state["lines"] = lines
+        plot_state["summary_lines"] = summary_lines
         plot_state["history"] = history
 
         # Prevent the plot window from stealing focus in Qt.
@@ -278,8 +443,10 @@ def _update_coverage_plot(
             window.show()
 
     lines = plot_state["lines"]
+    summary_lines = plot_state.get("summary_lines")
     history = plot_state["history"]
-    axes = plot_state["axes"]
+    axes_left = plot_state["axes_left"]
+    axes_right = plot_state.get("axes_right")
 
     for env_id in env_ids:
         metrics = state.metrics[env_id]
@@ -292,10 +459,18 @@ def _update_coverage_plot(
             value = float(teeth.get(tooth_id, {}).get("coverage", 0.0))
             env_hist["y"][tooth_id].append(value)
             lines[env_id][tooth_id].set_data(env_hist["t"], env_hist["y"][tooth_id])
+        if summary_lines is not None:
+            teeth_all = float(teeth.get("all", {}).get("coverage", 0.0))
+            env_hist["teeth_all"].append(teeth_all)
+            summary_lines[env_id].set_data(env_hist["t"], env_hist["teeth_all"])
 
-    for ax in axes:
+    for ax in axes_left:
         ax.relim()
         ax.autoscale_view(scalex=True, scaley=False)
+    if axes_right is not None:
+        for ax in axes_right:
+            ax.relim()
+            ax.autoscale_view(scalex=True, scaley=False)
 
     fig.canvas.draw_idle()
     fig.canvas.flush_events()
@@ -331,8 +506,10 @@ class _CoverageState:
 
     def maybe_update(self, env) -> None:
         step_buf = env.episode_length_buf
-        reset_ids = (step_buf == 0).nonzero(as_tuple=False).flatten()
-        if reset_ids.numel() > 0:
+        step_np = step_buf.detach().cpu().numpy().astype(np.int64)
+        reset_mask = (step_np <= 1) | (step_np < self.last_update_step)
+        if np.any(reset_mask):
+            reset_ids = torch.as_tensor(np.nonzero(reset_mask)[0], device=step_buf.device)
             self.reset_envs(reset_ids)
 
         camera = env.scene[self.camera_name]
@@ -475,6 +652,13 @@ def ee_delta_l2(env, ee_frame_cfg: SceneEntityCfg = SceneEntityCfg("ee_frame")) 
     return delta
 
 
+def step_progress_penalty(env, power: float = 1.0) -> torch.Tensor:
+    progress = env.episode_length_buf.float() / max(1, env.max_episode_length)
+    if power != 1.0:
+        progress = torch.pow(progress, float(power))
+    return progress
+
+
 def ee_far_from_teeth(
     env,
     max_distance: float,
@@ -544,6 +728,12 @@ def scanpoint_far_from_teeth_center(
     reward_plot_max_points: int = 200,
     reward_plot_pause: float = 0.001,
     reward_plot_env_ids: list[int] | None = None,
+    tcp_traj_plot: bool = False,
+    tcp_traj_plot_frame: str = "ee_frame",
+    tcp_traj_plot_interval: int = 1,
+    tcp_traj_plot_max_points: int = 500,
+    tcp_traj_plot_pause: float = 0.001,
+    tcp_traj_plot_env_ids: list[int] | None = None,
 ) -> torch.Tensor:
     params = {
         "resources_root": resources_root,
@@ -584,6 +774,15 @@ def scanpoint_far_from_teeth_center(
             pause=float(reward_plot_pause),
             env_ids=reward_plot_env_ids,
         )
+    if tcp_traj_plot:
+        _update_tcp_traj_plot(
+            env,
+            frame_name=tcp_traj_plot_frame,
+            update_interval=tcp_traj_plot_interval,
+            max_points=tcp_traj_plot_max_points,
+            pause=float(tcp_traj_plot_pause),
+            env_ids=tcp_traj_plot_env_ids,
+        )
     return dist > max_distance
 
 
@@ -619,6 +818,51 @@ def _build_params(
     }
 
 
+def teeth_coverage_reached(
+    env,
+    threshold: float,
+    resources_root: str,
+    dataset_id: str,
+    num_samples: int,
+    seed: int,
+    gum_assign_radius: float,
+    coverage_radius: float,
+    scale: tuple,
+    pcd_voxel_size: float,
+    pcd_max_points: int,
+    coverage_update_every: int,
+    camera_name: str,
+    data_type: str,
+    teeth_name: str,
+) -> torch.Tensor:
+    params = _build_params(
+        resources_root,
+        dataset_id,
+        num_samples,
+        seed,
+        gum_assign_radius,
+        coverage_radius,
+        scale,
+        pcd_voxel_size,
+        pcd_max_points,
+        coverage_update_every,
+        camera_name,
+        data_type,
+        teeth_name,
+    )
+    state = _get_state(env, params)
+    state.maybe_update(env)
+
+    coverage = torch.zeros(env.num_envs, device=env.device)
+    for env_id in range(env.num_envs):
+        metrics = state.metrics[env_id]
+        if not metrics:
+            continue
+        coverage[env_id] = float(metrics["teeth"]["all"]["coverage"])
+
+    return coverage >= float(threshold)
+
+
 def coverage_delta_reward(
     env,
     resources_root: str,
@@ -640,6 +884,7 @@ def coverage_delta_reward(
     coverage_plot_pause: float = 0.001,
     coverage_plot_env_ids: list[int] | None = None,
     coverage_plot_show_legend: bool = False,
+    coverage_plot_show_summary: bool = True,
 ) -> torch.Tensor:
     params = _build_params(
         resources_root,
@@ -666,8 +911,7 @@ def coverage_delta_reward(
             continue
         teeth_all = metrics["teeth"]["all"]["coverage"]
         teeth_gum_all = metrics["teeth_gum"]["all"]["coverage"]
-        gum_all = metrics["gum"]["coverage"]
-        coverage_sum[env_id] = float(teeth_all + teeth_gum_all + gum_all)
+        coverage_sum[env_id] = float(teeth_all + teeth_gum_all)
 
     delta = coverage_sum - state.last_coverage_sum
     state.last_coverage_sum = coverage_sum
@@ -680,6 +924,7 @@ def coverage_delta_reward(
             pause=float(coverage_plot_pause),
             env_ids=coverage_plot_env_ids,
             show_legend=coverage_plot_show_legend,
+            show_summary=coverage_plot_show_summary,
         )
     return delta
 
