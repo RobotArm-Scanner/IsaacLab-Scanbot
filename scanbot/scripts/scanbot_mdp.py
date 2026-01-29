@@ -55,14 +55,17 @@ class _CoverageState:
             raise KeyError(f"Camera output '{self.data_type}' not available for {self.camera_name}")
         depth = camera.data.output[self.data_type]
         intrinsics = camera.data.intrinsic_matrices
-        cam_pos = camera.data.pos_w
-        cam_quat = camera.data.quat_w_world
+        num_envs = env.num_envs
+        cam_pos, cam_quat_opengl = camera._view.get_world_poses()
+        cam_pos = cam_pos.to(depth.device)
+        cam_quat = math_utils.convert_camera_frame_orientation_convention(
+            cam_quat_opengl.to(depth.device), origin="opengl", target="ros"
+        )
 
         teeth = env.scene[self.teeth_name]
         teeth_pos = teeth.data.root_pos_w
         teeth_quat = teeth.data.root_quat_w
 
-        num_envs = env.num_envs
         for env_id in range(num_envs):
             step = int(step_buf[env_id].item())
             if self.update_every > 1 and step % self.update_every != 0:
@@ -161,6 +164,33 @@ def ee_delta_l2(env, ee_frame_cfg: SceneEntityCfg = SceneEntityCfg("ee_frame")) 
     return delta
 
 
+def ee_far_from_teeth(
+    env,
+    max_distance: float,
+    ee_frame_cfg: SceneEntityCfg = SceneEntityCfg("ee_frame"),
+    teeth_name: str = "teeth",
+) -> torch.Tensor:
+    ee_pos = env.scene[ee_frame_cfg.name].data.target_pos_w[:, 0, :] - env.scene.env_origins[:, 0:3]
+    teeth_pos = env.scene[teeth_name].data.root_pos_w - env.scene.env_origins[:, 0:3]
+    dist = torch.norm(ee_pos - teeth_pos, dim=1)
+    return dist > max_distance
+
+
+def scanpoint_far_from_support(
+    env,
+    max_distance: float,
+    camera_name: str = "wrist_camera",
+    support_name: str = "teeth_support",
+) -> torch.Tensor:
+    camera = env.scene[camera_name]
+    support = env.scene[support_name]
+    cam_pos, _ = camera._view.get_world_poses()
+    cam_pos = cam_pos.to(support.data.root_pos_w.device)
+    support_pos = support.data.root_pos_w
+    dist = torch.norm(cam_pos - support_pos, dim=1)
+    return dist > max_distance
+
+
 def _build_params(
     resources_root: str,
     dataset_id: str,
@@ -234,7 +264,8 @@ def coverage_delta_reward(
             continue
         teeth_all = metrics["teeth"]["all"]["coverage"]
         teeth_gum_all = metrics["teeth_gum"]["all"]["coverage"]
-        coverage_sum[env_id] = float(teeth_all + teeth_gum_all)
+        gum_all = metrics["gum"]["coverage"]
+        coverage_sum[env_id] = float(teeth_all + teeth_gum_all + gum_all)
 
     delta = coverage_sum - state.last_coverage_sum
     state.last_coverage_sum = coverage_sum
