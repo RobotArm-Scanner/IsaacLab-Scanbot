@@ -226,7 +226,7 @@ def load_teeth_surface_cache(
     points *= scale_val
 
     tooth_ids = np.unique(point_labels[point_labels > 0])
-    gum_tooth_ids = _compute_gum_tooth_ids(points, point_labels, tooth_ids, gum_assign_radius * scale_val)
+    gum_tooth_ids = _compute_gum_tooth_ids(points, point_labels, tooth_ids, gum_assign_radius)
 
     np.savez_compressed(
         cache_path,

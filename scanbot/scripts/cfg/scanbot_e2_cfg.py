@@ -76,11 +76,11 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for Scanbot RL."""
 
-    ee_delta = RewTerm(func=scanbot_mdp.ee_delta_l2, weight=-0.05, params={"ee_frame_cfg": SceneEntityCfg("ee_frame")})
-    step_penalty = RewTerm(func=scanbot_mdp.step_progress_penalty, weight=-0.2, params={"power": 1.0})
-    coverage_delta = RewTerm(func=scanbot_mdp.coverage_delta_reward, weight=5.0, params={})
-    per_tooth_bonus = RewTerm(func=scanbot_mdp.per_tooth_coverage_bonus, weight=2.0, params={})
-    total_bonus = RewTerm(func=scanbot_mdp.total_coverage_bonus, weight=10.0, params={})
+    ee_delta = RewTerm(func=scanbot_mdp.ee_delta_l2, weight=-0.1, params={"ee_frame_cfg": SceneEntityCfg("ee_frame")})
+    step_penalty = RewTerm(func=scanbot_mdp.step_progress_penalty, weight=-0.4, params={"power": 1.0})
+    coverage_delta = RewTerm(func=scanbot_mdp.coverage_delta_reward, weight=20.0, params={})
+    per_tooth_bonus = RewTerm(func=scanbot_mdp.per_tooth_coverage_bonus, weight=1.0, params={})
+    total_bonus = RewTerm(func=scanbot_mdp.total_coverage_bonus, weight=120.0, params={})
 
 
 @configclass
@@ -588,7 +588,20 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
             "coverage_plot_show_legend": True,
             "coverage_plot_show_summary": True,
         }
-        self.rewards.coverage_delta.params = dict(self.coverage_params, **self.coverage_plot_params)
+        self.teeth_gum_plot_params = {
+            "teeth_gum_plot": True,
+            "teeth_gum_plot_interval": 1,
+            "teeth_gum_plot_max_points": 200,
+            "teeth_gum_plot_pause": 0.001,
+            "teeth_gum_plot_env_ids": None,
+            "teeth_gum_plot_show_legend": True,
+            "teeth_gum_plot_show_summary": True,
+        }
+        self.rewards.coverage_delta.params = dict(
+            self.coverage_params,
+            **self.coverage_plot_params,
+            **self.teeth_gum_plot_params,
+        )
         self.rewards.per_tooth_bonus.params = dict(
             self.coverage_params,
             threshold=self.coverage_threshold_tooth,

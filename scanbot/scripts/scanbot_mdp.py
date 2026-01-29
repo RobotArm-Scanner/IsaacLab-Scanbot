@@ -341,6 +341,159 @@ def _update_tcp_traj_plot(
     fig.canvas.flush_events()
     plt.pause(pause)
 
+
+def _get_teeth_gum_plot_state(env, key: tuple) -> dict:
+    state = getattr(env, "_scanbot_teeth_gum_plot_state", None)
+    if state is None or state.get("key") != key:
+        state = {
+            "key": key,
+            "fig": None,
+            "axes_left": None,
+            "axes_right": None,
+            "lines": None,
+            "summary_lines": None,
+            "history": None,
+        }
+        env._scanbot_teeth_gum_plot_state = state
+    return state
+
+
+def _update_teeth_gum_plot(
+    env,
+    state: "_CoverageState",
+    update_interval: int = 1,
+    max_points: int = 200,
+    pause: float = 0.001,
+    env_ids: list[int] | None = None,
+    show_legend: bool = False,
+    show_summary: bool = True,
+) -> None:
+    step = getattr(env, "common_step_counter", 0)
+    interval = int(update_interval) if update_interval else 1
+    if interval > 1 and step % interval != 0:
+        return
+
+    if env_ids is None:
+        env_ids = list(range(env.num_envs))
+
+    if not env_ids:
+        return
+
+    tooth_ids = [str(int(tid)) for tid in state.tracker.surface.tooth_ids]
+    key = (tuple(env_ids), tuple(tooth_ids), int(max_points), bool(show_legend), bool(show_summary))
+
+    import matplotlib
+    import matplotlib.pyplot as plt
+    from collections import deque
+
+    plot_state = _get_teeth_gum_plot_state(env, key)
+    fig = plot_state.get("fig")
+    axes_left = plot_state.get("axes_left")
+    axes_right = plot_state.get("axes_right")
+    if fig is None or not plt.fignum_exists(fig.number):
+        plt.ion()
+        plt.rcParams["figure.raise_window"] = False
+        if show_summary:
+            fig, axes = plt.subplots(
+                len(env_ids),
+                2,
+                sharex=True,
+                figsize=(12, 3 * len(env_ids)),
+            )
+            axes = np.asarray(axes)
+            if axes.ndim == 1:
+                axes = axes.reshape(1, 2)
+            axes_left = [axes[i][0] for i in range(len(env_ids))]
+            axes_right = [axes[i][1] for i in range(len(env_ids))]
+        else:
+            fig, axes = plt.subplots(len(env_ids), 1, sharex=True, figsize=(10, 3 * len(env_ids)))
+            if len(env_ids) == 1:
+                axes = [axes]
+            axes_left = list(axes)
+            axes_right = None
+        fig.canvas.manager.set_window_title("Scanbot Teeth_Gum Coverage per Tooth")
+
+        lines: dict[int, dict[str, object]] = {}
+        summary_lines: dict[int, object] | None = {} if show_summary else None
+        history: dict[int, dict[str, object]] = {}
+        for row, env_id in enumerate(env_ids):
+            left_ax = axes_left[row]
+            left_ax.set_ylabel(f"env {env_id}")
+            left_ax.set_ylim(0.0, 1.0)
+            left_ax.grid(True, alpha=0.3)
+            env_lines: dict[str, object] = {}
+            env_hist: dict[str, object] = {"t": deque(maxlen=max_points), "y": {}, "teeth_gum_all": deque(maxlen=max_points)}
+            for tooth_id in tooth_ids:
+                line, = left_ax.plot([], [], label=tooth_id)
+                env_lines[tooth_id] = line
+                env_hist["y"][tooth_id] = deque(maxlen=max_points)
+            if show_legend:
+                left_ax.legend(loc="upper right", ncol=4, fontsize="x-small")
+            lines[env_id] = env_lines
+            history[env_id] = env_hist
+            if show_summary and axes_right is not None:
+                right_ax = axes_right[row]
+                right_ax.set_ylabel("teeth_gum/all")
+                right_ax.set_ylim(0.0, 1.0)
+                right_ax.grid(True, alpha=0.3)
+                summary_line, = right_ax.plot([], [], label="teeth_gum/all")
+                summary_lines[env_id] = summary_line
+        axes_left[-1].set_xlabel("step")
+        if show_summary and axes_right is not None:
+            axes_right[-1].set_xlabel("step")
+
+        plot_state["fig"] = fig
+        plot_state["axes_left"] = axes_left
+        plot_state["axes_right"] = axes_right
+        plot_state["lines"] = lines
+        plot_state["summary_lines"] = summary_lines
+        plot_state["history"] = history
+
+        # Prevent the plot window from stealing focus in Qt.
+        if "Qt" in str(matplotlib.get_backend()):
+            from matplotlib.backends.qt_compat import QtCore
+
+            window = fig.canvas.manager.window
+            window.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
+            window.setWindowFlag(QtCore.Qt.Tool, True)
+            window.setFocusPolicy(QtCore.Qt.NoFocus)
+            window.show()
+
+    lines = plot_state["lines"]
+    summary_lines = plot_state.get("summary_lines")
+    history = plot_state["history"]
+    axes_left = plot_state["axes_left"]
+    axes_right = plot_state.get("axes_right")
+
+    for env_id in env_ids:
+        metrics = state.metrics[env_id]
+        if not metrics:
+            continue
+        teeth_gum = metrics.get("teeth_gum", {})
+        env_hist = history[env_id]
+        env_hist["t"].append(step)
+        for tooth_id in tooth_ids:
+            value = float(teeth_gum.get(tooth_id, {}).get("coverage", 0.0))
+            env_hist["y"][tooth_id].append(value)
+            lines[env_id][tooth_id].set_data(env_hist["t"], env_hist["y"][tooth_id])
+        if summary_lines is not None:
+            teeth_gum_all = float(teeth_gum.get("all", {}).get("coverage", 0.0))
+            env_hist["teeth_gum_all"].append(teeth_gum_all)
+            summary_lines[env_id].set_data(env_hist["t"], env_hist["teeth_gum_all"])
+
+    for ax in axes_left:
+        ax.relim()
+        ax.autoscale_view(scalex=True, scaley=False)
+    if axes_right is not None:
+        for ax in axes_right:
+            ax.relim()
+            ax.autoscale_view(scalex=True, scaley=False)
+
+    fig.canvas.draw_idle()
+    fig.canvas.flush_events()
+    plt.pause(pause)
+
+
 def _update_coverage_plot(
     env,
     state: "_CoverageState",
@@ -484,6 +637,7 @@ class _CoverageState:
     last_update_step: np.ndarray
     last_coverage_sum: torch.Tensor
     rewarded_teeth: List[set]
+    rewarded_teeth_gum: List[set]
     rewarded_total: np.ndarray
     pcd_voxel_size: float
     pcd_max_points: int
@@ -502,6 +656,7 @@ class _CoverageState:
             self.last_update_step[env_id] = -1
             self.last_coverage_sum[env_id] = 0.0
             self.rewarded_teeth[env_id].clear()
+            self.rewarded_teeth_gum[env_id].clear()
             self.rewarded_total[env_id] = False
 
     def maybe_update(self, env) -> None:
@@ -597,6 +752,7 @@ def _get_state(env, params: Dict[str, object]) -> _CoverageState:
             last_update_step=np.full((num_envs,), -1, dtype=np.int64),
             last_coverage_sum=torch.zeros(num_envs, device=env.device),
             rewarded_teeth=[set() for _ in range(num_envs)],
+            rewarded_teeth_gum=[set() for _ in range(num_envs)],
             rewarded_total=np.zeros((num_envs,), dtype=bool),
             pcd_voxel_size=float(params["pcd_voxel_size"]),
             pcd_max_points=int(params["pcd_max_points"]),
@@ -858,7 +1014,9 @@ def teeth_coverage_reached(
         metrics = state.metrics[env_id]
         if not metrics:
             continue
-        coverage[env_id] = float(metrics["teeth"]["all"]["coverage"])
+        teeth_all = float(metrics["teeth"]["all"]["coverage"])
+        teeth_gum_all = float(metrics["teeth_gum"]["all"]["coverage"])
+        coverage[env_id] = 0.5 * (teeth_all + teeth_gum_all)
 
     return coverage >= float(threshold)
 
@@ -885,6 +1043,13 @@ def coverage_delta_reward(
     coverage_plot_env_ids: list[int] | None = None,
     coverage_plot_show_legend: bool = False,
     coverage_plot_show_summary: bool = True,
+    teeth_gum_plot: bool = False,
+    teeth_gum_plot_interval: int = 1,
+    teeth_gum_plot_max_points: int = 200,
+    teeth_gum_plot_pause: float = 0.001,
+    teeth_gum_plot_env_ids: list[int] | None = None,
+    teeth_gum_plot_show_legend: bool = False,
+    teeth_gum_plot_show_summary: bool = True,
 ) -> torch.Tensor:
     params = _build_params(
         resources_root,
@@ -925,6 +1090,17 @@ def coverage_delta_reward(
             env_ids=coverage_plot_env_ids,
             show_legend=coverage_plot_show_legend,
             show_summary=coverage_plot_show_summary,
+        )
+    if teeth_gum_plot:
+        _update_teeth_gum_plot(
+            env,
+            state,
+            update_interval=teeth_gum_plot_interval,
+            max_points=teeth_gum_plot_max_points,
+            pause=float(teeth_gum_plot_pause),
+            env_ids=teeth_gum_plot_env_ids,
+            show_legend=teeth_gum_plot_show_legend,
+            show_summary=teeth_gum_plot_show_summary,
         )
     return delta
 
@@ -970,11 +1146,18 @@ def per_tooth_coverage_bonus(
         if not metrics:
             continue
         teeth = metrics["teeth"]
+        teeth_gum = metrics["teeth_gum"]
         for tooth_id, data in teeth.items():
             if tooth_id == "all":
                 continue
             if data["coverage"] >= threshold and tooth_id not in state.rewarded_teeth[env_id]:
                 state.rewarded_teeth[env_id].add(tooth_id)
+                reward[env_id] += 1.0
+        for tooth_id, data in teeth_gum.items():
+            if tooth_id == "all":
+                continue
+            if data["coverage"] >= threshold and tooth_id not in state.rewarded_teeth_gum[env_id]:
+                state.rewarded_teeth_gum[env_id].add(tooth_id)
                 reward[env_id] += 1.0
     return reward
 
