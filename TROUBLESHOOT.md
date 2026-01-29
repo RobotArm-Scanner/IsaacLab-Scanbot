@@ -1,85 +1,86 @@
-# Troubleshooting Notes
+# 트러블슈팅 노트
 
-## Camera depth output size 0 at init
-**Symptoms**
-- Crash during env init with:
+## 초기화 시 카메라 depth 출력 크기가 0
+**증상**
+- env 초기화 중 아래 에러로 크래시:
   `RuntimeError: shape '[H, W, 1]' is invalid for input of size 0`
-  from `isaaclab/sensors/camera/camera.py::_process_annotator_output`.
+  (`isaaclab/sensors/camera/camera.py::_process_annotator_output`)
 
-**Cause**
-- Camera data is accessed during ObservationManager init (before replicator is ready).
+**원인**
+- Replicator가 준비되기 전에(ObservationManager 초기화 단계) 카메라 데이터를 접근함.
 
-**Fix**
-- Do not call camera observations during init (remove image obs from policy group).
-- Keep depth in camera config but access it after sim starts.
-- If depth is still empty for a frame, skip coverage update for that step.
+**해결**
+- 초기화 단계에서 카메라 관측을 호출하지 않기(Policy group에서 image obs 제거).
+- 카메라 cfg에는 depth 설정을 유지하되, sim 시작 이후에 접근.
+- 특정 프레임에서 depth가 비어있으면 해당 step의 커버리지 업데이트를 스킵.
 
-## num_envs not matching cfg
-**Symptoms**
-- Env shows `num_envs = 1` even if cfg sets a higher value.
+## cfg의 num_envs와 실제 num_envs가 다름
+**증상**
+- cfg에서 더 큰 값을 설정했는데도 `num_envs = 1`로 동작함.
 
-**Cause**
-- `scanbot.sh` passes `--num_envs ${SCANBOT_NUM_ENVS:-1}` which overrides cfg.
+**원인**
+- `scanbot.sh`가 `--num_envs ${SCANBOT_NUM_ENVS:-1}`를 전달하면서 cfg 값을 override함.
 
-**Fix**
-- Set `SCANBOT_NUM_ENVS=2` (or desired value) before running `scanbot.sh`, or
-- Pass `--num_envs` to the training script.
+**해결**
+- `scanbot.sh` 실행 전에 `SCANBOT_NUM_ENVS=2`(원하는 값)로 설정하거나,
+- 학습 스크립트에 `--num_envs`를 직접 전달.
 
-## Isaac Sim startup hang
-**Symptoms**
-- Isaac Sim does not fully start or becomes unresponsive.
+## Isaac Sim 시작이 멈추거나 응답 없음
+**증상**
+- Isaac Sim이 완전히 올라오지 않거나 멈춘 것처럼 보임.
 
-**Fix**
-- Stop the process from tmux (Ctrl+C) or kill in container:
+**해결**
+- tmux에서 프로세스를 중지(Ctrl+C)하거나, 컨테이너에서 강제 종료:
   `pkill -f scanbot_launcher.py`
-- Restart via tmux session `isaaclab`.
+- tmux 세션(`isaaclab${DOCKER_NAME_SUFFIX}`; 예: `isaaclab-dev`)에서 다시 실행.
 
-## RL training: env not registered
-**Symptoms**
+## RL 학습: env가 등록되지 않음
+**증상**
 - `gymnasium.error.NameNotFound: Environment e2.t3ds.rl doesn't exist.`
 
-**Fix**
-- Added `isaaclab_tasks.manager_based.scanbot` module to import `scanbot_task` so `isaaclab_tasks` auto-registers.
+**해결**
+- `isaaclab_tasks`가 자동 등록할 수 있도록 `scanbot_task`를 import하도록 `isaaclab_tasks.manager_based.scanbot` 모듈을 추가.
 
-## RL training: missing omni.usd.metrics.assembler
-**Symptoms**
+## RL 학습: omni.usd.metrics.assembler 누락
+**증상**
 - `ModuleNotFoundError: No module named 'omni.metrics'`
 
-**Fix**
-- Pass kit args: `--kit_args "--enable omni.usd.metrics.assembler"`
+**해결**
+- kit args를 전달:
+  `--kit_args "--enable omni.usd.metrics.assembler"`
 
-## RL training: camera requires enable_cameras
-**Symptoms**
+## RL 학습: 카메라 사용 시 enable_cameras 필요
+**증상**
 - `RuntimeError: A camera was spawned without the --enable_cameras flag.`
 
-**Fix**
-- Pass `--enable_cameras` to training/launch.
+**해결**
+- 학습/런치 시 `--enable_cameras`를 전달.
 
-## RL training: GLXBadFBConfig in headless
-**Symptoms**
-- `GLXBadFBConfig` when using `--headless` with cameras.
+## RL 학습: headless에서 GLXBadFBConfig
+**증상**
+- 카메라 사용 + `--headless` 조합에서 `GLXBadFBConfig` 발생.
 
-**Fix**
-- Run non-headless with `DISPLAY=:3`, or configure EGL properly.
+**해결**
+- `DISPLAY=:3` 등으로 non-headless로 실행하거나, EGL을 올바르게 구성.
 
-## RL training: actor_critic expects 1D obs
-**Symptoms**
+## RL 학습: actor_critic이 1D obs를 기대
+**증상**
 - `AssertionError: The ActorCritic module only supports 1D observations.`
 
-**Fix**
-- Use `ScanbotRLObservationsCfg` with `policy.concatenate_terms = True` to flatten obs.
+**해결**
+- `ScanbotRLObservationsCfg` 사용 + `policy.concatenate_terms = True`로 관측을 flatten.
 
-## RL training: hydra cannot serialize OpenXR lambda
-**Symptoms**
+## RL 학습: hydra가 OpenXR lambda를 직렬화 못함
+**증상**
 - `ValueError: Could not resolve the input string 'lambda headpose' into callable object.`
 
-**Fix**
-- In RL config, set `xr.anchor_rotation_custom_func = None` and disable `teleop_devices`.
+**해결**
+- RL cfg에서 `xr.anchor_rotation_custom_func = None`으로 설정하고 `teleop_devices` 비활성화.
 
-## RL training: PhysX GPU kernel failures at high env counts
-**Symptoms**
-- Logs show `PhysX error: ... fail to launch kernel` and `PhysX has reported too many errors, simulation has been stopped.`
+## RL 학습: env 수가 많을 때 PhysX GPU 커널 실패
+**증상**
+- 로그에 `PhysX error: ... fail to launch kernel`, `PhysX has reported too many errors, simulation has been stopped.` 출력.
 
-**Fix**
-- Reduce `--num_envs` (env8 failed in our bench; env1-4 were stable).
-- Consider lowering render/camera load or disabling extra sensors.
+**해결**
+- `--num_envs`를 줄이기(벤치에서 env8은 실패했고 env1~4는 안정적).
+- 렌더/카메라 부하를 줄이거나 추가 센서를 비활성화하는 것도 고려.
