@@ -541,12 +541,11 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
                 "support_name": "teeth_support",
                 "debug_draw": True,
                 "debug_draw_interval": 1,
-                "tcp_plot": True,
-                "tcp_plot_frame": "ee_frame",
-                "tcp_plot_interval": 1,
-                "tcp_plot_max_points": 200,
-                "tcp_plot_pause": 0.001,
-                "tcp_plot_env_ids": None,
+                "reward_plot": True,
+                "reward_plot_interval": 1,
+                "reward_plot_max_points": 200,
+                "reward_plot_pause": 0.001,
+                "reward_plot_env_ids": None,
             },
         )
 
@@ -567,7 +566,15 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
             "data_type": "distance_to_image_plane",
             "teeth_name": "teeth",
         }
-        self.rewards.coverage_delta.params = dict(self.coverage_params)
+        self.coverage_plot_params = {
+            "coverage_plot": True,
+            "coverage_plot_interval": 1,
+            "coverage_plot_max_points": 200,
+            "coverage_plot_pause": 0.001,
+            "coverage_plot_env_ids": None,
+            "coverage_plot_show_legend": True,
+        }
+        self.rewards.coverage_delta.params = dict(self.coverage_params, **self.coverage_plot_params)
         self.rewards.per_tooth_bonus.params = dict(
             self.coverage_params,
             threshold=self.coverage_threshold_tooth,

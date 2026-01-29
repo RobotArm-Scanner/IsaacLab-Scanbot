@@ -32,23 +32,22 @@ def _get_scanpoint_debug_state(env, max_distance: float):
     return state
 
 
-def _get_tcp_plot_state(env, key: tuple) -> dict:
-    state = getattr(env, "_scanbot_tcp_plot_state", None)
+def _get_reward_plot_state(env, key: tuple) -> dict:
+    state = getattr(env, "_scanbot_reward_plot_state", None)
     if state is None or state.get("key") != key:
         state = {
             "key": key,
             "fig": None,
             "ax": None,
-            "lines": {},
-            "history": {},
+            "line": None,
+            "history": None,
         }
-        env._scanbot_tcp_plot_state = state
+        env._scanbot_reward_plot_state = state
     return state
 
 
-def _update_tcp_plot(
+def _update_reward_plot(
     env,
-    frame_name: str = "ee_frame",
     update_interval: int = 1,
     max_points: int = 200,
     pause: float = 0.001,
@@ -69,22 +68,26 @@ def _update_tcp_plot(
     import matplotlib.pyplot as plt
     from collections import deque
 
-    key = (tuple(env_ids), int(max_points), frame_name)
-    state = _get_tcp_plot_state(env, key)
+    key = (tuple(env_ids), int(max_points))
+    state = _get_reward_plot_state(env, key)
     fig = state.get("fig")
     ax = state.get("ax")
     if fig is None or not plt.fignum_exists(fig.number):
         plt.ion()
         plt.rcParams["figure.raise_window"] = False
         fig, ax = plt.subplots()
-        fig.canvas.manager.set_window_title("Scanbot TCP (local)")
+        fig.canvas.manager.set_window_title("Scanbot Mean Reward")
         ax.set_xlabel("step")
-        ax.set_ylabel("tcp (local)")
+        ax.set_ylabel("mean reward")
         ax.grid(True, alpha=0.3)
         state["fig"] = fig
         state["ax"] = ax
-        state["lines"] = {}
-        state["history"] = {}
+        state["line"], = ax.plot([], [], label="mean_reward")
+        ax.legend(loc="upper right", fontsize="small")
+        state["history"] = {
+            "t": deque(maxlen=max_points),
+            "r": deque(maxlen=max_points),
+        }
         # Prevent the plot window from stealing focus in Qt.
         if "Qt" in str(matplotlib.get_backend()):
             from matplotlib.backends.qt_compat import QtCore
@@ -95,44 +98,125 @@ def _update_tcp_plot(
             window.setFocusPolicy(QtCore.Qt.NoFocus)
             window.show()
 
-    env_origins = env.scene.env_origins[:, 0:3]
-    tcp_pos_w = env.scene[frame_name].data.target_pos_w[:, 0, :]
-    tcp_local = tcp_pos_w - env_origins
-    tcp_np = tcp_local.detach().cpu().numpy()
-
-    for env_id in env_ids:
-        if env_id < 0 or env_id >= env.num_envs:
-            continue
-        hist = state["history"].get(env_id)
-        if hist is None:
-            hist = {
-                "t": deque(maxlen=max_points),
-                "x": deque(maxlen=max_points),
-                "y": deque(maxlen=max_points),
-                "z": deque(maxlen=max_points),
-            }
-            state["history"][env_id] = hist
-        x, y, z = tcp_np[env_id].tolist()
-        hist["t"].append(step)
-        hist["x"].append(x)
-        hist["y"].append(y)
-        hist["z"].append(z)
-
-        lines = state["lines"].get(env_id)
-        if lines is None:
-            lines = {}
-            lines["x"], = ax.plot([], [], label=f"env{env_id} x")
-            lines["y"], = ax.plot([], [], label=f"env{env_id} y")
-            lines["z"], = ax.plot([], [], label=f"env{env_id} z")
-            state["lines"][env_id] = lines
-            ax.legend(loc="upper right", fontsize="small")
-
-        lines["x"].set_data(hist["t"], hist["x"])
-        lines["y"].set_data(hist["t"], hist["y"])
-        lines["z"].set_data(hist["t"], hist["z"])
+    rewards = env.reward_manager._reward_buf[env_ids].detach().cpu().numpy()
+    mean_reward = float(rewards.mean())
+    history = state["history"]
+    history["t"].append(step)
+    history["r"].append(mean_reward)
+    state["line"].set_data(history["t"], history["r"])
 
     ax.relim()
     ax.autoscale_view()
+    fig.canvas.draw_idle()
+    fig.canvas.flush_events()
+    plt.pause(pause)
+
+
+def _get_coverage_plot_state(env, key: tuple) -> dict:
+    state = getattr(env, "_scanbot_coverage_plot_state", None)
+    if state is None or state.get("key") != key:
+        state = {
+            "key": key,
+            "fig": None,
+            "axes": None,
+            "lines": None,
+            "history": None,
+        }
+        env._scanbot_coverage_plot_state = state
+    return state
+
+
+def _update_coverage_plot(
+    env,
+    state: "_CoverageState",
+    update_interval: int = 1,
+    max_points: int = 200,
+    pause: float = 0.001,
+    env_ids: list[int] | None = None,
+    show_legend: bool = False,
+) -> None:
+    step = getattr(env, "common_step_counter", 0)
+    interval = int(update_interval) if update_interval else 1
+    if interval > 1 and step % interval != 0:
+        return
+
+    if env_ids is None:
+        env_ids = list(range(env.num_envs))
+
+    if not env_ids:
+        return
+
+    tooth_ids = [str(int(tid)) for tid in state.tracker.surface.tooth_ids]
+    key = (tuple(env_ids), tuple(tooth_ids), int(max_points), bool(show_legend))
+
+    import matplotlib
+    import matplotlib.pyplot as plt
+    from collections import deque
+
+    plot_state = _get_coverage_plot_state(env, key)
+    fig = plot_state.get("fig")
+    axes = plot_state.get("axes")
+    if fig is None or not plt.fignum_exists(fig.number):
+        plt.ion()
+        plt.rcParams["figure.raise_window"] = False
+        fig, axes = plt.subplots(len(env_ids), 1, sharex=True, figsize=(10, 3 * len(env_ids)))
+        if len(env_ids) == 1:
+            axes = [axes]
+        fig.canvas.manager.set_window_title("Scanbot Coverage per Tooth")
+
+        lines: dict[int, dict[str, object]] = {}
+        history: dict[int, dict[str, object]] = {}
+        for ax, env_id in zip(axes, env_ids):
+            ax.set_ylabel(f"env {env_id}")
+            ax.set_ylim(0.0, 1.0)
+            ax.grid(True, alpha=0.3)
+            env_lines: dict[str, object] = {}
+            env_hist: dict[str, object] = {"t": deque(maxlen=max_points), "y": {}}
+            for tooth_id in tooth_ids:
+                line, = ax.plot([], [], label=tooth_id)
+                env_lines[tooth_id] = line
+                env_hist["y"][tooth_id] = deque(maxlen=max_points)
+            if show_legend:
+                ax.legend(loc="upper right", ncol=4, fontsize="x-small")
+            lines[env_id] = env_lines
+            history[env_id] = env_hist
+        axes[-1].set_xlabel("step")
+
+        plot_state["fig"] = fig
+        plot_state["axes"] = axes
+        plot_state["lines"] = lines
+        plot_state["history"] = history
+
+        # Prevent the plot window from stealing focus in Qt.
+        if "Qt" in str(matplotlib.get_backend()):
+            from matplotlib.backends.qt_compat import QtCore
+
+            window = fig.canvas.manager.window
+            window.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
+            window.setWindowFlag(QtCore.Qt.Tool, True)
+            window.setFocusPolicy(QtCore.Qt.NoFocus)
+            window.show()
+
+    lines = plot_state["lines"]
+    history = plot_state["history"]
+    axes = plot_state["axes"]
+
+    for env_id in env_ids:
+        metrics = state.metrics[env_id]
+        if not metrics:
+            continue
+        teeth = metrics.get("teeth", {})
+        env_hist = history[env_id]
+        env_hist["t"].append(step)
+        for tooth_id in tooth_ids:
+            value = float(teeth.get(tooth_id, {}).get("coverage", 0.0))
+            env_hist["y"][tooth_id].append(value)
+            lines[env_id][tooth_id].set_data(env_hist["t"], env_hist["y"][tooth_id])
+
+    for ax in axes:
+        ax.relim()
+        ax.autoscale_view(scalex=True, scaley=False)
+
     fig.canvas.draw_idle()
     fig.canvas.flush_events()
     plt.pause(pause)
@@ -304,12 +388,11 @@ def scanpoint_far_from_support(
     support_name: str = "teeth_support",
     debug_draw: bool = False,
     debug_draw_interval: int = 1,
-    tcp_plot: bool = False,
-    tcp_plot_frame: str = "ee_frame",
-    tcp_plot_interval: int = 1,
-    tcp_plot_max_points: int = 200,
-    tcp_plot_pause: float = 0.001,
-    tcp_plot_env_ids: list[int] | None = None,
+    reward_plot: bool = False,
+    reward_plot_interval: int = 1,
+    reward_plot_max_points: int = 200,
+    reward_plot_pause: float = 0.001,
+    reward_plot_env_ids: list[int] | None = None,
 ) -> torch.Tensor:
     camera = env.scene[camera_name]
     support = env.scene[support_name]
@@ -384,14 +467,13 @@ def scanpoint_far_from_support(
                     thickness.append(2.0)
 
                 draw.draw_lines(starts, ends, colors, thickness)
-    if tcp_plot:
-        _update_tcp_plot(
+    if reward_plot:
+        _update_reward_plot(
             env,
-            frame_name=tcp_plot_frame,
-            update_interval=tcp_plot_interval,
-            max_points=tcp_plot_max_points,
-            pause=float(tcp_plot_pause),
-            env_ids=tcp_plot_env_ids,
+            update_interval=reward_plot_interval,
+            max_points=reward_plot_max_points,
+            pause=float(reward_plot_pause),
+            env_ids=reward_plot_env_ids,
         )
     return dist > max_distance
 
@@ -443,6 +525,12 @@ def coverage_delta_reward(
     camera_name: str,
     data_type: str,
     teeth_name: str,
+    coverage_plot: bool = False,
+    coverage_plot_interval: int = 1,
+    coverage_plot_max_points: int = 200,
+    coverage_plot_pause: float = 0.001,
+    coverage_plot_env_ids: list[int] | None = None,
+    coverage_plot_show_legend: bool = False,
 ) -> torch.Tensor:
     params = _build_params(
         resources_root,
@@ -474,6 +562,16 @@ def coverage_delta_reward(
 
     delta = coverage_sum - state.last_coverage_sum
     state.last_coverage_sum = coverage_sum
+    if coverage_plot:
+        _update_coverage_plot(
+            env,
+            state,
+            update_interval=coverage_plot_interval,
+            max_points=coverage_plot_max_points,
+            pause=float(coverage_plot_pause),
+            env_ids=coverage_plot_env_ids,
+            show_legend=coverage_plot_show_legend,
+        )
     return delta
 
 
