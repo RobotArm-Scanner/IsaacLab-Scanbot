@@ -246,6 +246,27 @@ def voxel_downsample(points: np.ndarray, voxel_size: float) -> np.ndarray:
     return points[idx]
 
 
+def compute_tooth_centers(surface: TeethSurfaceCache) -> Dict[str, np.ndarray]:
+    """Compute per-tooth centers in the surface local frame."""
+    centers: Dict[str, np.ndarray] = {}
+    for tooth_id in surface.tooth_ids:
+        mask = surface.labels == tooth_id
+        if not np.any(mask):
+            continue
+        center = surface.points[mask].mean(axis=0)
+        centers[str(int(tooth_id))] = center.astype(np.float32)
+    return centers
+
+
+def compute_teeth_center(surface: TeethSurfaceCache) -> np.ndarray:
+    """Compute the center of tooth centers in the surface local frame."""
+    centers = compute_tooth_centers(surface)
+    if not centers:
+        return np.zeros(3, dtype=np.float32)
+    stacked = np.stack(list(centers.values()), axis=0)
+    return stacked.mean(axis=0).astype(np.float32)
+
+
 class CoverageTracker:
     """Incremental coverage tracker with cached surface samples."""
 

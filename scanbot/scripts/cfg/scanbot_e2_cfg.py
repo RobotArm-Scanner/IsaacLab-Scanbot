@@ -534,11 +534,17 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
 
         # Terminations (failure conditions)
         self.terminations.scanpoint_far_from_support = DoneTerm(
-            func=scanbot_mdp.scanpoint_far_from_support,
+            func=scanbot_mdp.scanpoint_far_from_teeth_center,
             params={
-                "max_distance": 0.18,
+                "max_distance": 0.10,
+                "resources_root": self.resources_root,
+                "dataset_id": self.teeth_dataset_id,
+                "num_samples": 20000,
+                "seed": 0,
+                "gum_assign_radius": 0.002,
+                "scale": self.scene.teeth.spawn.scale,
                 "camera_name": "wrist_camera",
-                "support_name": "teeth_support",
+                "teeth_name": "teeth",
                 "debug_draw": True,
                 "debug_draw_interval": 1,
                 "reward_plot": True,

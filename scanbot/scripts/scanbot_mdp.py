@@ -13,6 +13,7 @@ from isaaclab.sensors.camera import utils as camera_utils
 from isaaclab.utils import math as math_utils
 
 from scanbot.scripts.utilities.teeth3ds_utils import CoverageTracker
+from scanbot.scripts.utilities.teeth3ds_utils import compute_teeth_center
 from scanbot.scripts.utilities.teeth3ds_utils import load_teeth_surface_cache
 from scanbot.scripts.utilities.teeth3ds_utils import voxel_downsample
 
@@ -30,6 +31,85 @@ def _get_scanpoint_debug_state(env, max_distance: float):
         }
         env._scanbot_scanpoint_debug_state = state
     return state
+
+
+def _maybe_draw_scanpoint_debug(
+    env,
+    max_distance: float,
+    cam_pos: torch.Tensor,
+    support_pos: torch.Tensor,
+    dist: torch.Tensor,
+    debug_draw_interval: int,
+) -> None:
+    step = getattr(env, "common_step_counter", 0)
+    interval = int(debug_draw_interval) if debug_draw_interval else 1
+    if interval > 1 and step % interval != 0:
+        return
+    state = _get_scanpoint_debug_state(env, max_distance)
+    draw = state["draw"]
+    if draw is None:
+        state["draw"] = omni_debug_draw.acquire_debug_draw_interface()
+        draw = state["draw"]
+    if draw is None:
+        return
+
+    support_np = support_pos.detach().cpu().numpy()
+    if support_np.ndim == 1:
+        support_np = support_np.reshape(1, 3)
+    cam_np = cam_pos.detach().cpu().numpy()
+    if cam_np.ndim == 1:
+        cam_np = cam_np.reshape(1, 3)
+    dist_np = dist.detach().cpu().numpy().reshape(-1)
+
+    # Rebuild the wireframe each update to avoid stale debug lines.
+    draw.clear_lines()
+
+    starts: list[list[float]] = []
+    ends: list[list[float]] = []
+    colors: list[list[float]] = []
+    thickness: list[float] = []
+
+    theta = np.linspace(0.0, 2.0 * np.pi, 49)
+    cos_t = np.cos(theta)
+    sin_t = np.sin(theta)
+    sphere_color = [0.2, 0.7, 1.0, 0.9]
+
+    for i in range(support_np.shape[0]):
+        center = support_np[i]
+        r = float(max_distance)
+        # XY circle
+        for j in range(len(theta) - 1):
+            p0 = center + np.array([cos_t[j], sin_t[j], 0.0]) * r
+            p1 = center + np.array([cos_t[j + 1], sin_t[j + 1], 0.0]) * r
+            starts.append(p0.tolist())
+            ends.append(p1.tolist())
+            colors.append(sphere_color)
+            thickness.append(1.5)
+        # XZ circle
+        for j in range(len(theta) - 1):
+            p0 = center + np.array([cos_t[j], 0.0, sin_t[j]]) * r
+            p1 = center + np.array([cos_t[j + 1], 0.0, sin_t[j + 1]]) * r
+            starts.append(p0.tolist())
+            ends.append(p1.tolist())
+            colors.append(sphere_color)
+            thickness.append(1.5)
+        # YZ circle
+        for j in range(len(theta) - 1):
+            p0 = center + np.array([0.0, cos_t[j], sin_t[j]]) * r
+            p1 = center + np.array([0.0, cos_t[j + 1], sin_t[j + 1]]) * r
+            starts.append(p0.tolist())
+            ends.append(p1.tolist())
+            colors.append(sphere_color)
+            thickness.append(1.5)
+
+        # Support -> camera line (green inside, red outside).
+        starts.append(center.tolist())
+        ends.append(cam_np[i].tolist())
+        inside = dist_np[i] <= max_distance
+        colors.append([0.1, 0.9, 0.2, 0.9] if inside else [1.0, 0.2, 0.2, 0.9])
+        thickness.append(2.0)
+
+    draw.draw_lines(starts, ends, colors, thickness)
 
 
 def _get_reward_plot_state(env, key: tuple) -> dict:
@@ -353,6 +433,32 @@ def _get_state(env, params: Dict[str, object]) -> _CoverageState:
     return state
 
 
+def _get_teeth_center_state(env, params: Dict[str, object]) -> dict:
+    cache_key = (
+        params["dataset_id"],
+        params["num_samples"],
+        params["seed"],
+        params["gum_assign_radius"],
+        params["scale"],
+    )
+    state = getattr(env, "_scanbot_teeth_center_state", None)
+    if state is None or state.get("key") != cache_key:
+        surface = load_teeth_surface_cache(
+            resources_root=params["resources_root"],
+            dataset_id=params["dataset_id"],
+            num_samples=params["num_samples"],
+            seed=params["seed"],
+            gum_assign_radius=params["gum_assign_radius"],
+            scale=params["scale"],
+        )
+        state = {
+            "key": cache_key,
+            "center_local": compute_teeth_center(surface),
+        }
+        env._scanbot_teeth_center_state = state
+    return state
+
+
 def ee_delta_l2(env, ee_frame_cfg: SceneEntityCfg = SceneEntityCfg("ee_frame")) -> torch.Tensor:
     ee_pos = env.scene[ee_frame_cfg.name].data.target_pos_w[:, 0, :] - env.scene.env_origins[:, 0:3]
     last_pos = getattr(env, "_scanbot_last_ee_pos", None)
@@ -401,72 +507,75 @@ def scanpoint_far_from_support(
     support_pos = support.data.root_pos_w
     dist = torch.norm(cam_pos - support_pos, dim=1)
     if debug_draw:
-        step = getattr(env, "common_step_counter", 0)
-        interval = int(debug_draw_interval) if debug_draw_interval else 1
-        if interval <= 1 or step % interval == 0:
-            state = _get_scanpoint_debug_state(env, max_distance)
-            draw = state["draw"]
-            if draw is None:
-                state["draw"] = omni_debug_draw.acquire_debug_draw_interface()
-                draw = state["draw"]
-            if draw is not None:
-                support_np = support_pos.detach().cpu().numpy()
-                if support_np.ndim == 1:
-                    support_np = support_np.reshape(1, 3)
-                cam_np = cam_pos.detach().cpu().numpy()
-                if cam_np.ndim == 1:
-                    cam_np = cam_np.reshape(1, 3)
-                dist_np = dist.detach().cpu().numpy().reshape(-1)
+        _maybe_draw_scanpoint_debug(
+            env,
+            max_distance=max_distance,
+            cam_pos=cam_pos,
+            support_pos=support_pos,
+            dist=dist,
+            debug_draw_interval=debug_draw_interval,
+        )
+    if reward_plot:
+        _update_reward_plot(
+            env,
+            update_interval=reward_plot_interval,
+            max_points=reward_plot_max_points,
+            pause=float(reward_plot_pause),
+            env_ids=reward_plot_env_ids,
+        )
+    return dist > max_distance
 
-                # Rebuild the wireframe each update to avoid stale debug lines.
-                draw.clear_lines()
 
-                starts: list[list[float]] = []
-                ends: list[list[float]] = []
-                colors: list[list[float]] = []
-                thickness: list[float] = []
+def scanpoint_far_from_teeth_center(
+    env,
+    max_distance: float,
+    resources_root: str,
+    dataset_id: str,
+    num_samples: int,
+    seed: int,
+    gum_assign_radius: float,
+    scale: tuple,
+    camera_name: str = "wrist_camera",
+    teeth_name: str = "teeth",
+    debug_draw: bool = False,
+    debug_draw_interval: int = 1,
+    reward_plot: bool = False,
+    reward_plot_interval: int = 1,
+    reward_plot_max_points: int = 200,
+    reward_plot_pause: float = 0.001,
+    reward_plot_env_ids: list[int] | None = None,
+) -> torch.Tensor:
+    params = {
+        "resources_root": resources_root,
+        "dataset_id": dataset_id,
+        "num_samples": num_samples,
+        "seed": seed,
+        "gum_assign_radius": gum_assign_radius,
+        "scale": scale,
+    }
+    state = _get_teeth_center_state(env, params)
+    camera = env.scene[camera_name]
+    cam_pos, _ = camera._view.get_world_poses()
 
-                theta = np.linspace(0.0, 2.0 * np.pi, 49)
-                cos_t = np.cos(theta)
-                sin_t = np.sin(theta)
-                sphere_color = [0.2, 0.7, 1.0, 0.9]
+    teeth = env.scene[teeth_name]
+    teeth_pos = teeth.data.root_pos_w
+    teeth_quat = teeth.data.root_quat_w
+    cam_pos = cam_pos.to(teeth_pos.device)
 
-                for i in range(support_np.shape[0]):
-                    center = support_np[i]
-                    r = float(max_distance)
-                    # XY circle
-                    for j in range(len(theta) - 1):
-                        p0 = center + np.array([cos_t[j], sin_t[j], 0.0]) * r
-                        p1 = center + np.array([cos_t[j + 1], sin_t[j + 1], 0.0]) * r
-                        starts.append(p0.tolist())
-                        ends.append(p1.tolist())
-                        colors.append(sphere_color)
-                        thickness.append(1.5)
-                    # XZ circle
-                    for j in range(len(theta) - 1):
-                        p0 = center + np.array([cos_t[j], 0.0, sin_t[j]]) * r
-                        p1 = center + np.array([cos_t[j + 1], 0.0, sin_t[j + 1]]) * r
-                        starts.append(p0.tolist())
-                        ends.append(p1.tolist())
-                        colors.append(sphere_color)
-                        thickness.append(1.5)
-                    # YZ circle
-                    for j in range(len(theta) - 1):
-                        p0 = center + np.array([0.0, cos_t[j], sin_t[j]]) * r
-                        p1 = center + np.array([0.0, cos_t[j + 1], sin_t[j + 1]]) * r
-                        starts.append(p0.tolist())
-                        ends.append(p1.tolist())
-                        colors.append(sphere_color)
-                        thickness.append(1.5)
+    center_local = torch.as_tensor(state["center_local"], device=teeth_pos.device)
+    center_local = center_local.unsqueeze(0).expand(teeth_pos.shape[0], -1)
+    center_world = math_utils.quat_apply(teeth_quat, center_local) + teeth_pos
 
-                    # Support -> camera line (green inside, red outside).
-                    starts.append(center.tolist())
-                    ends.append(cam_np[i].tolist())
-                    inside = dist_np[i] <= max_distance
-                    colors.append([0.1, 0.9, 0.2, 0.9] if inside else [1.0, 0.2, 0.2, 0.9])
-                    thickness.append(2.0)
-
-                draw.draw_lines(starts, ends, colors, thickness)
+    dist = torch.norm(cam_pos - center_world, dim=1)
+    if debug_draw:
+        _maybe_draw_scanpoint_debug(
+            env,
+            max_distance=max_distance,
+            cam_pos=cam_pos,
+            support_pos=center_world,
+            dist=dist,
+            debug_draw_interval=debug_draw_interval,
+        )
     if reward_plot:
         _update_reward_plot(
             env,
