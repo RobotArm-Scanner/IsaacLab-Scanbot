@@ -34,6 +34,7 @@ from isaaclab.sim.spawners.from_files.from_files_cfg import UsdFileCfg
 from isaaclab.utils import configclass
 from isaaclab_tasks.manager_based.manipulation.stack import mdp
 from scanbot.scripts import scanbot_mdp
+from scanbot.scripts.rl.debug import config as debug_config
 from scanbot.scripts.utilities.pos_util import quat_wxyz_from_deg_xyz
 from scanbot.scripts.utilities.teeth3ds_util import ensure_t3ds_usd
 from scanbot.scripts.utilities.usd_util import spawn_usd_with_mesh_collision, spawn_rigid_object_from_usd
@@ -89,8 +90,17 @@ class ScanbotRLObservationsCfg(ObservationsCfg):
 
     @configclass
     class PolicyCfg(ObservationsCfg.PolicyCfg):
+        actions = ObsTerm(func=mdp.last_action)
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+        scanpoint_pos = ObsTerm(func=scanbot_mdp.scanpoint_pos, params={"camera_name": "wrist_camera"})
+        scanpoint_rot_xyz = ObsTerm(
+            func=scanbot_mdp.scanpoint_euler_xyz,
+            params={"camera_name": "wrist_camera", "normalize_quat": True},
+        )
+
         def __post_init__(self):
-            super().__post_init__()
+            self.enable_corruption = False
             self.concatenate_terms = True
 
     policy: PolicyCfg = PolicyCfg()
@@ -536,30 +546,22 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
         # Terminations (failure conditions)
         self.terminations.scanpoint_far_from_support = DoneTerm(
             func=scanbot_mdp.scanpoint_far_from_teeth_center,
-            params={
-                "max_distance": 0.10,
-                "resources_root": self.resources_root,
-                "dataset_id": self.teeth_dataset_id,
-                "num_samples": 20000,
-                "seed": 0,
-                "gum_assign_radius": 0.002,
-                "scale": self.scene.teeth.spawn.scale,
-                "camera_name": "wrist_camera",
-                "teeth_name": "teeth",
-                "debug_draw": True,
-                "debug_draw_interval": 1,
-                "reward_plot": True,
-                "reward_plot_interval": 1,
-                "reward_plot_max_points": 200,
-                "reward_plot_pause": 0.001,
-                "reward_plot_env_ids": None,
-                "tcp_traj_plot": True,
-                "tcp_traj_plot_frame": "ee_frame",
-                "tcp_traj_plot_interval": 1,
-                "tcp_traj_plot_max_points": 500,
-                "tcp_traj_plot_pause": 0.001,
-                "tcp_traj_plot_env_ids": None,
-            },
+            params=dict(
+                {
+                    "max_distance": 0.08,
+                    "resources_root": self.resources_root,
+                    "dataset_id": self.teeth_dataset_id,
+                    "num_samples": 20000,
+                    "seed": 0,
+                    "gum_assign_radius": 0.002,
+                    "scale": self.scene.teeth.spawn.scale,
+                    "camera_name": "wrist_camera",
+                    "teeth_name": "teeth",
+                },
+                **debug_config.scanpoint_debug_params(),
+                **debug_config.reward_plot_params(),
+                **debug_config.tcp_traj_plot_params(),
+            ),
         )
 
         self.coverage_threshold_tooth = 0.8
@@ -579,24 +581,8 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
             "data_type": "distance_to_image_plane",
             "teeth_name": "teeth",
         }
-        self.coverage_plot_params = {
-            "coverage_plot": True,
-            "coverage_plot_interval": 1,
-            "coverage_plot_max_points": 200,
-            "coverage_plot_pause": 0.001,
-            "coverage_plot_env_ids": None,
-            "coverage_plot_show_legend": True,
-            "coverage_plot_show_summary": True,
-        }
-        self.teeth_gum_plot_params = {
-            "teeth_gum_plot": True,
-            "teeth_gum_plot_interval": 1,
-            "teeth_gum_plot_max_points": 200,
-            "teeth_gum_plot_pause": 0.001,
-            "teeth_gum_plot_env_ids": None,
-            "teeth_gum_plot_show_legend": True,
-            "teeth_gum_plot_show_summary": True,
-        }
+        self.coverage_plot_params = debug_config.coverage_plot_params()
+        self.teeth_gum_plot_params = debug_config.teeth_gum_plot_params()
         self.rewards.coverage_delta.params = dict(
             self.coverage_params,
             **self.coverage_plot_params,

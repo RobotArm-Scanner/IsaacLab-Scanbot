@@ -73,6 +73,7 @@
   `/workspace/isaaclab/_isaac_sim/python.sh -m pip install PyQt5`
 - 컨테이너에 xcb 관련 라이브러리 설치:
   `apt-get update && apt-get install -y libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xkb1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-randr0 libxcb-shape0 libxcb-xfixes0 libxcb-sync1 libxcb-util1`
+- PyQt5만 설치하면 충분하며, 시스템 Python에 설치해도 Isaac Sim에는 반영되지 않음(반드시 `python.sh` 사용).
 - host에서 X 권한 열기:
   `DISPLAY=:59 xhost +local:`
 - 컨테이너/세션에서:
