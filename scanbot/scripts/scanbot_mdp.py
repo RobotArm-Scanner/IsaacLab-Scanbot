@@ -16,6 +16,127 @@ from scanbot.scripts.utilities.teeth3ds_utils import CoverageTracker
 from scanbot.scripts.utilities.teeth3ds_utils import load_teeth_surface_cache
 from scanbot.scripts.utilities.teeth3ds_utils import voxel_downsample
 
+import isaacsim.util.debug_draw._debug_draw as omni_debug_draw
+
+
+def _get_scanpoint_debug_state(env, max_distance: float):
+    state = getattr(env, "_scanbot_scanpoint_debug_state", None)
+    radius = float(max_distance)
+    if state is None or state["radius"] != radius or state["num_envs"] != env.num_envs:
+        state = {
+            "radius": radius,
+            "num_envs": env.num_envs,
+            "draw": None,
+        }
+        env._scanbot_scanpoint_debug_state = state
+    return state
+
+
+def _get_tcp_plot_state(env, key: tuple) -> dict:
+    state = getattr(env, "_scanbot_tcp_plot_state", None)
+    if state is None or state.get("key") != key:
+        state = {
+            "key": key,
+            "fig": None,
+            "ax": None,
+            "lines": {},
+            "history": {},
+        }
+        env._scanbot_tcp_plot_state = state
+    return state
+
+
+def _update_tcp_plot(
+    env,
+    frame_name: str = "ee_frame",
+    update_interval: int = 1,
+    max_points: int = 200,
+    pause: float = 0.001,
+    env_ids: list[int] | None = None,
+) -> None:
+    step = getattr(env, "common_step_counter", 0)
+    interval = int(update_interval) if update_interval else 1
+    if interval > 1 and step % interval != 0:
+        return
+
+    if env_ids is None:
+        env_ids = list(range(env.num_envs))
+
+    if not env_ids:
+        return
+
+    import matplotlib
+    import matplotlib.pyplot as plt
+    from collections import deque
+
+    key = (tuple(env_ids), int(max_points), frame_name)
+    state = _get_tcp_plot_state(env, key)
+    fig = state.get("fig")
+    ax = state.get("ax")
+    if fig is None or not plt.fignum_exists(fig.number):
+        plt.ion()
+        plt.rcParams["figure.raise_window"] = False
+        fig, ax = plt.subplots()
+        fig.canvas.manager.set_window_title("Scanbot TCP (local)")
+        ax.set_xlabel("step")
+        ax.set_ylabel("tcp (local)")
+        ax.grid(True, alpha=0.3)
+        state["fig"] = fig
+        state["ax"] = ax
+        state["lines"] = {}
+        state["history"] = {}
+        # Prevent the plot window from stealing focus in Qt.
+        if "Qt" in str(matplotlib.get_backend()):
+            from matplotlib.backends.qt_compat import QtCore
+
+            window = fig.canvas.manager.window
+            window.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
+            window.setWindowFlag(QtCore.Qt.Tool, True)
+            window.setFocusPolicy(QtCore.Qt.NoFocus)
+            window.show()
+
+    env_origins = env.scene.env_origins[:, 0:3]
+    tcp_pos_w = env.scene[frame_name].data.target_pos_w[:, 0, :]
+    tcp_local = tcp_pos_w - env_origins
+    tcp_np = tcp_local.detach().cpu().numpy()
+
+    for env_id in env_ids:
+        if env_id < 0 or env_id >= env.num_envs:
+            continue
+        hist = state["history"].get(env_id)
+        if hist is None:
+            hist = {
+                "t": deque(maxlen=max_points),
+                "x": deque(maxlen=max_points),
+                "y": deque(maxlen=max_points),
+                "z": deque(maxlen=max_points),
+            }
+            state["history"][env_id] = hist
+        x, y, z = tcp_np[env_id].tolist()
+        hist["t"].append(step)
+        hist["x"].append(x)
+        hist["y"].append(y)
+        hist["z"].append(z)
+
+        lines = state["lines"].get(env_id)
+        if lines is None:
+            lines = {}
+            lines["x"], = ax.plot([], [], label=f"env{env_id} x")
+            lines["y"], = ax.plot([], [], label=f"env{env_id} y")
+            lines["z"], = ax.plot([], [], label=f"env{env_id} z")
+            state["lines"][env_id] = lines
+            ax.legend(loc="upper right", fontsize="small")
+
+        lines["x"].set_data(hist["t"], hist["x"])
+        lines["y"].set_data(hist["t"], hist["y"])
+        lines["z"].set_data(hist["t"], hist["z"])
+
+    ax.relim()
+    ax.autoscale_view()
+    fig.canvas.draw_idle()
+    fig.canvas.flush_events()
+    plt.pause(pause)
+
 
 @dataclass
 class _CoverageState:
@@ -181,6 +302,14 @@ def scanpoint_far_from_support(
     max_distance: float,
     camera_name: str = "wrist_camera",
     support_name: str = "teeth_support",
+    debug_draw: bool = False,
+    debug_draw_interval: int = 1,
+    tcp_plot: bool = False,
+    tcp_plot_frame: str = "ee_frame",
+    tcp_plot_interval: int = 1,
+    tcp_plot_max_points: int = 200,
+    tcp_plot_pause: float = 0.001,
+    tcp_plot_env_ids: list[int] | None = None,
 ) -> torch.Tensor:
     camera = env.scene[camera_name]
     support = env.scene[support_name]
@@ -188,6 +317,82 @@ def scanpoint_far_from_support(
     cam_pos = cam_pos.to(support.data.root_pos_w.device)
     support_pos = support.data.root_pos_w
     dist = torch.norm(cam_pos - support_pos, dim=1)
+    if debug_draw:
+        step = getattr(env, "common_step_counter", 0)
+        interval = int(debug_draw_interval) if debug_draw_interval else 1
+        if interval <= 1 or step % interval == 0:
+            state = _get_scanpoint_debug_state(env, max_distance)
+            draw = state["draw"]
+            if draw is None:
+                state["draw"] = omni_debug_draw.acquire_debug_draw_interface()
+                draw = state["draw"]
+            if draw is not None:
+                support_np = support_pos.detach().cpu().numpy()
+                if support_np.ndim == 1:
+                    support_np = support_np.reshape(1, 3)
+                cam_np = cam_pos.detach().cpu().numpy()
+                if cam_np.ndim == 1:
+                    cam_np = cam_np.reshape(1, 3)
+                dist_np = dist.detach().cpu().numpy().reshape(-1)
+
+                # Rebuild the wireframe each update to avoid stale debug lines.
+                draw.clear_lines()
+
+                starts: list[list[float]] = []
+                ends: list[list[float]] = []
+                colors: list[list[float]] = []
+                thickness: list[float] = []
+
+                theta = np.linspace(0.0, 2.0 * np.pi, 49)
+                cos_t = np.cos(theta)
+                sin_t = np.sin(theta)
+                sphere_color = [0.2, 0.7, 1.0, 0.9]
+
+                for i in range(support_np.shape[0]):
+                    center = support_np[i]
+                    r = float(max_distance)
+                    # XY circle
+                    for j in range(len(theta) - 1):
+                        p0 = center + np.array([cos_t[j], sin_t[j], 0.0]) * r
+                        p1 = center + np.array([cos_t[j + 1], sin_t[j + 1], 0.0]) * r
+                        starts.append(p0.tolist())
+                        ends.append(p1.tolist())
+                        colors.append(sphere_color)
+                        thickness.append(1.5)
+                    # XZ circle
+                    for j in range(len(theta) - 1):
+                        p0 = center + np.array([cos_t[j], 0.0, sin_t[j]]) * r
+                        p1 = center + np.array([cos_t[j + 1], 0.0, sin_t[j + 1]]) * r
+                        starts.append(p0.tolist())
+                        ends.append(p1.tolist())
+                        colors.append(sphere_color)
+                        thickness.append(1.5)
+                    # YZ circle
+                    for j in range(len(theta) - 1):
+                        p0 = center + np.array([0.0, cos_t[j], sin_t[j]]) * r
+                        p1 = center + np.array([0.0, cos_t[j + 1], sin_t[j + 1]]) * r
+                        starts.append(p0.tolist())
+                        ends.append(p1.tolist())
+                        colors.append(sphere_color)
+                        thickness.append(1.5)
+
+                    # Support -> camera line (green inside, red outside).
+                    starts.append(center.tolist())
+                    ends.append(cam_np[i].tolist())
+                    inside = dist_np[i] <= max_distance
+                    colors.append([0.1, 0.9, 0.2, 0.9] if inside else [1.0, 0.2, 0.2, 0.9])
+                    thickness.append(2.0)
+
+                draw.draw_lines(starts, ends, colors, thickness)
+    if tcp_plot:
+        _update_tcp_plot(
+            env,
+            frame_name=tcp_plot_frame,
+            update_interval=tcp_plot_interval,
+            max_points=tcp_plot_max_points,
+            pause=float(tcp_plot_pause),
+            env_ids=tcp_plot_env_ids,
+        )
     return dist > max_distance
 
 

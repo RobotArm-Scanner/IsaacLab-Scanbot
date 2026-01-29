@@ -498,6 +498,16 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
         self.sim.render_interval = 1
         self.episode_length_s = 20.0
         self.actions.arm_action.scale = 0.01
+        # self.sim.render.rendering_mode = "quality"
+        # self.sim.render.enable_translucency = True
+        # self.sim.render.enable_reflections = True
+        # self.sim.render.enable_global_illumination = True
+        # self.sim.render.carb_settings = {
+        #     "/rtx/rendermode": "PathTracing",
+        #     "/rtx/raytracing/fractionalCutoutOpacity": True,
+        #     "/rtx/material/translucencyAsOpacity": True,
+        #     "/rtx/translucency/maxRefractionBounces": 6,
+        # }
 
         # Observation: do not include action history
         self.observations = ScanbotRLObservationsCfg()
@@ -526,9 +536,17 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
         self.terminations.scanpoint_far_from_support = DoneTerm(
             func=scanbot_mdp.scanpoint_far_from_support,
             params={
-                "max_distance": 0.3,
+                "max_distance": 0.18,
                 "camera_name": "wrist_camera",
                 "support_name": "teeth_support",
+                "debug_draw": True,
+                "debug_draw_interval": 1,
+                "tcp_plot": True,
+                "tcp_plot_frame": "ee_frame",
+                "tcp_plot_interval": 1,
+                "tcp_plot_max_points": 200,
+                "tcp_plot_pause": 0.001,
+                "tcp_plot_env_ids": None,
             },
         )
 
