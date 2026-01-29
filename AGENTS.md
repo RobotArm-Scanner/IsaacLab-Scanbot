@@ -17,8 +17,8 @@
 - 나는 보통 tmux 세션 `isaaclab${DOCKER_NAME_SUFFIX}`에서 컨테이너에 진입한 다음에 저 명령을 실행해 (없으면 네가 세션을 만들 것)
 - 내가 직접 띄워둔 경우도 있으니 항상 tmux 세션 유무와 현재 쉘이 호스트인지 컨테이너 내부인지 먼저 확인할 것
 - IsaacLab 실행 전에는 기존 프로세스가 남아있는지 반드시 확인하고(중복 실행 방지), 종료가 확실히 된 것을 확인한 뒤에만 새로 실행할 것
-- IsaacLab은 반드시 tmux 세션 `isaaclab${DOCKER_NAME_SUFFIX}`에서만 띄울 것(백그라운드/분리 실행 금지)
-- 이 세션에 `Ctrl + C` 또는 `Ctrl + Z` 이후 `kill %1` (kill을 여러번 보내야 할 수도 있음, 또는 프로세스 검색 후 `kill`)을 쓰면 아이작 심을 종료할 수 있음
+- IsaacLab은 반드시 tmux 세션 `isaaclab${DOCKER_NAME_SUFFIX}`에서만 띄울 것 (백그라운드/분리 실행 금지)
+- 이 세션에 `Ctrl + C` 또는 `Ctrl + Z` 이후 `kill %1` (kill을 여러번 보내야 할 수도 있음, 또는 `pkill -f SCRIPT_NAME.py`와 같이 찾아서 종료)을 쓰면 아이작 심을 종료할 수 있음
 - 저 형태로 종료가 안되는 경우 컨테이너에 들어가서 프로세스를 찾아서 죽이면 됨
 - IsaacLab 실행간에 디스플레이가 필요한 경우 `set -a && source docker/.env.scanbot && set +a`으로 환경변수를 로딩하면 `DISPLAY` 변수가 설정됨
 
