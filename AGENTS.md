@@ -5,9 +5,9 @@
 
 # 지칭 및 세팅
 - 이 시스템을 `호스트(host)`라고 부를 것임
-- `./docker/.env.scanbot`의 `PROJECT_SUFFIX` 환경변수를 `PROJECT_SUFFIX`라고 부를 것임
+- `docker/.env.scanbot`의 `PROJECT_SUFFIX` 환경변수를 `PROJECT_SUFFIX`라고 부를 것임
 - `PROJECT_SUFFIX`는 `프로젝트 식별자`라고 불리기도 함
-- `./docker/.env.scanbot`의 `DOCKER_NAME_SUFFIX` 환경변수를 `DOCKER_NAME_SUFFIX`라고 부를 것임
+- `docker/.env.scanbot`의 `DOCKER_NAME_SUFFIX` 환경변수를 `DOCKER_NAME_SUFFIX`라고 부를 것임
 - 여기서 언급되는 컨테이너란 `isaac-lab-scanbot${DOCKER_NAME_SUFFIX}` 컨테이너를 말함
 - 프로젝트 루트의 `scanbot` 디렉토리는 컨테이너의 `/workspace/isaaclab/scanbot` 디렉토리에 마운트 되어있음 
 
@@ -20,7 +20,7 @@
 - IsaacLab은 반드시 tmux 세션 `isaaclab${DOCKER_NAME_SUFFIX}`에서만 띄울 것(백그라운드/분리 실행 금지)
 - 이 세션에 `Ctrl + C` 또는 `Ctrl + Z` 이후 `kill %1` (kill을 여러번 보내야 할 수도 있음, 또는 프로세스 검색 후 `kill`)을 쓰면 아이작 심을 종료할 수 있음
 - 저 형태로 종료가 안되는 경우 컨테이너에 들어가서 프로세스를 찾아서 죽이면 됨
-- IsaacLab 실행간에 디스플레이가 필요한 경우 `set -a && source ./docker/.env.scanbot && set +a`으로 환경변수를 로딩하면 `DISPLAY` 변수가 설정됨
+- IsaacLab 실행간에 디스플레이가 필요한 경우 `set -a && source docker/.env.scanbot && set +a`으로 환경변수를 로딩하면 `DISPLAY` 변수가 설정됨
 
 # 프로젝트
 - `scanbot` 폴더가 내가 주요하게 작업하는 공간임
@@ -34,14 +34,14 @@
 
 # 컨테이너 제어
 - 컨테이너 제어 스크립트 실행 전에 DISPLAY 환경 변수를 위에서 언급한 것처럼 설정해야 할 수도 있음
-- `./docker/.env.scanbot`에 DISPLAY 환경 변수가 정의되지 않은 경우 사용자에게 어떤 값을 사용할지 물어볼 것
+- `docker/.env.scanbot`에 DISPLAY 환경 변수가 정의되지 않은 경우 사용자에게 어떤 값을 사용할지 물어볼 것
 - 컨테이너 삭제를 요구하는 경우, `stop` → 관련 `volume`도 찾아서 삭제가 필요
 ```bash
-./docker/container.sh stop scanbot
+docker/container.sh stop scanbot
 # 컨테이너 종료
-./docker/container.sh start scanbot --no-build
+docker/container.sh start scanbot --no-build
 # 빌드 없이 컨테이너 재시작, 재부팅 후나 꼬인 경우 이 명령어로 컨테이너만 재시작
-./docker/container.sh build scanbot --target scanbot
+docker/container.sh build scanbot --target scanbot
 # 스캔봇 이미지만 재빌드, 
 # start 명령은 `--no-build` 없이 실행 시 빌드 + 실행을 같이합니다.
 # build 명령은 이미지만 빌드합니다. --target 없이 빌드할 경우 scanbot 이미지의 부모 이미지인 base 이미지와 scanbot 이미지를 순차적으로 빌드합니다.

@@ -57,8 +57,39 @@ scanbot
 - 자주 쓰는 Verb 예시: `Add`, `Fix`, `Update`, `Move`, `Refactor`, `Rename`, `Simplify`, `Drop`, `Replace`, `Implement`, `Improve`
 
 ## 권장 개발 환경 세팅
-### 필수 점검 사항
-- `/etc/sudoers`를 편집하여 `USERNAME ALL=(ALL:ALL) NOPASSWD: ALL`을 추가해서 호스트를 자율제어 할 수 있게 합니다.
+### 환경 설정
+```bash
+# 컨테이너 생성 (이미지 빌드 포함)
+docker/container.sh start scanbot
+```
+```bash
+# 이미지 빌드가 되어있는 경우 컨테이너만 시작
+docker/container.sh start scanbot --no-build
+```
+```bash
+# 컨테이너 정지
+docker/container.sh stop scanbot
+```
+```bash
+# 컨테이너 진입
+docker/container.sh enter scanbot
+```
+
+`docker/docker-compose.yaml`에서 GPU 설정 부분을 아래와 같이 설정하여, 컨테이너에 노출될 GPU를 지정할 수 있습니다.
+```yaml
+...
+x-default-isaac-lab-deploy: &default-isaac-lab-deploy
+  resources:
+    reservations:
+      devices:
+        - driver: nvidia
+          device_ids: [ "0", "1", "2", "3" ]
+          # 0, 1, 2, 3번 GPU만 컨테이너에서 사용
+          capabilities: [ gpu ]
+...
+```
+
+- `/etc/sudoers`를 편집하여 `USERNAME ALL=(ALL:ALL) NOPASSWD: ALL`을 추가해서 `AI Agent`가 호스트를 자율제어 할 수 있게 합니다.
 - `docker/.env.scanbot`의 `PROJECT_SUFFIX`를 `main`, `dev1`등으로 지정하면, 동일한 다른 `scanbot` 프로젝트와 컨테이너/이미지 충돌을 피할 수 있습니다. 
 
 ### 권장 점검 사항
@@ -66,10 +97,10 @@ scanbot
 - `VNC`는 호스트에 설치하여 사용합니다. (`TigerVNC`)
 - `AI Agent`는 컨테이너 내부가 아니라 호스트에서 실행합니다.
 
-### AI Agent 권장 설정
+#### AI Agent 권장 설정
 `codex --yolo`등의 자율 제어 모드로 실행을 권장
 
-## tmux-mcp
+### tmux-mcp
 ```bash
 npm install -g tmux-mcp
 ```
@@ -79,13 +110,13 @@ npm install -g tmux-mcp
 command = "npx"
 args = ["-y", "--no-install", "tmux-mcp"]
 ```
-## 웹 검색 요청 허용
+### 웹 검색 요청 허용
 ```toml
 [features]
 web_search_request = true
 ```
 
-## AI Agent 기반 개발 예시 메시지
+### AI Agent 기반 개발 예시 메시지
 - 권장 환경 세팅이 되었는지 점검해 줘
 - 아이작랩을 껐다가 켜줘
 - `exec_bridge`로 현재 `wrist_camera`를 확인하고 판단해 줘
