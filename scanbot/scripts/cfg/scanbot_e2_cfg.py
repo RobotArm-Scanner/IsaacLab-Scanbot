@@ -497,6 +497,7 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
         self.scene.num_envs = 4
         self.sim.render_interval = 1
         self.episode_length_s = 20.0
+        self.actions.arm_action.scale = 0.01
 
         # Observation: do not include action history
         self.observations = ScanbotRLObservationsCfg()

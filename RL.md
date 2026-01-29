@@ -58,4 +58,6 @@ export DISPLAY=:3
   --enable_cameras --kit_args "--enable omni.usd.metrics.assembler"
 ```
 
+실행 세부 절차는 `README.rl.md`를 참고하세요.
+
 안정성이 확인된 뒤에 `num_envs`와 iteration을 점진적으로 늘립니다.
