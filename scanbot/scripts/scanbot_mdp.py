@@ -454,6 +454,7 @@ def coverage_delta_reward(
     camera_name: str,
     data_type: str,
     teeth_name: str,
+    no_progress_penalty: float = -0.1,
     coverage_plot: bool = False,
     coverage_plot_interval: int = 1,
     coverage_plot_max_points: int = 200,
@@ -498,6 +499,13 @@ def coverage_delta_reward(
 
     delta = coverage_sum - state.last_coverage_sum
     state.last_coverage_sum = coverage_sum
+    if no_progress_penalty:
+        penalty = torch.where(
+            delta <= 0.0,
+            delta.new_full(delta.shape, float(no_progress_penalty)),
+            delta.new_zeros(delta.shape),
+        )
+        delta = delta + penalty
     rl_debug.update_coverage_plot(
         env,
         state,
