@@ -536,6 +536,7 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
         self.scene.wrist_camera.update_period = 0.1
         self.scene.wrist_camera.height = 128
         self.scene.wrist_camera.width = 128
+        self.scene.wrist_camera.spawn.clipping_range = (0.001, 0.02)
 
         # Disable image observations for now (stability first)
         self.image_obs_list = []
