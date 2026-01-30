@@ -28,6 +28,8 @@ class _CoverageState:
     last_coverage_sum: torch.Tensor
     rewarded_teeth: List[set]
     rewarded_teeth_gum: List[set]
+    seen_teeth: List[set]
+    seen_teeth_gum: List[set]
     rewarded_total: np.ndarray
     pcd_voxel_size: float
     pcd_max_points: int
@@ -47,6 +49,8 @@ class _CoverageState:
             self.last_coverage_sum[env_id] = 0.0
             self.rewarded_teeth[env_id].clear()
             self.rewarded_teeth_gum[env_id].clear()
+            self.seen_teeth[env_id].clear()
+            self.seen_teeth_gum[env_id].clear()
             self.rewarded_total[env_id] = False
 
     def maybe_update(self, env) -> None:
@@ -143,6 +147,8 @@ def _get_state(env, params: Dict[str, object]) -> _CoverageState:
             last_coverage_sum=torch.zeros(num_envs, device=env.device),
             rewarded_teeth=[set() for _ in range(num_envs)],
             rewarded_teeth_gum=[set() for _ in range(num_envs)],
+            seen_teeth=[set() for _ in range(num_envs)],
+            seen_teeth_gum=[set() for _ in range(num_envs)],
             rewarded_total=np.zeros((num_envs,), dtype=bool),
             pcd_voxel_size=float(params["pcd_voxel_size"]),
             pcd_max_points=int(params["pcd_max_points"]),
@@ -533,6 +539,7 @@ def per_tooth_coverage_bonus(
     camera_name: str,
     data_type: str,
     teeth_name: str,
+    first_hit_reward: float = 0.1,
 ) -> torch.Tensor:
     params = _build_params(
         resources_root,
@@ -553,6 +560,7 @@ def per_tooth_coverage_bonus(
     state.maybe_update(env)
 
     reward = torch.zeros(env.num_envs, device=env.device)
+    first_hit_reward = float(first_hit_reward)
     for env_id in range(env.num_envs):
         metrics = state.metrics[env_id]
         if not metrics:
@@ -562,12 +570,18 @@ def per_tooth_coverage_bonus(
         for tooth_id, data in teeth.items():
             if tooth_id == "all":
                 continue
+            if data["coverage"] > 0.0 and tooth_id not in state.seen_teeth[env_id]:
+                state.seen_teeth[env_id].add(tooth_id)
+                reward[env_id] += first_hit_reward
             if data["coverage"] >= threshold and tooth_id not in state.rewarded_teeth[env_id]:
                 state.rewarded_teeth[env_id].add(tooth_id)
                 reward[env_id] += 1.0
         for tooth_id, data in teeth_gum.items():
             if tooth_id == "all":
                 continue
+            if data["coverage"] > 0.0 and tooth_id not in state.seen_teeth_gum[env_id]:
+                state.seen_teeth_gum[env_id].add(tooth_id)
+                reward[env_id] += first_hit_reward
             if data["coverage"] >= threshold and tooth_id not in state.rewarded_teeth_gum[env_id]:
                 state.rewarded_teeth_gum[env_id].add(tooth_id)
                 reward[env_id] += 1.0

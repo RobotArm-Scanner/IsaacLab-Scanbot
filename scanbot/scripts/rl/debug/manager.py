@@ -17,7 +17,7 @@ _CONTROL = {
 }
 
 _LABELS = [
-    ("Mean Reward", "reward_plot"),
+    ("Reward", "reward_plot"),
     ("Teeth Coverage", "coverage_plot"),
     ("Teeth_Gum Coverage", "teeth_gum_plot"),
     ("TCP 3D Trajectory", "tcp_traj_plot"),

@@ -592,6 +592,7 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
         self.rewards.per_tooth_bonus.params = dict(
             self.coverage_params,
             threshold=self.coverage_threshold_tooth,
+            first_hit_reward=0.1,
         )
         self.rewards.total_bonus.params = dict(
             self.coverage_params,
