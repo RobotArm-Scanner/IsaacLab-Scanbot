@@ -25,7 +25,7 @@ class _CoverageState:
     tracker: CoverageTracker
     metrics: List[Dict[str, Dict[str, float]]]
     last_update_step: np.ndarray
-    last_coverage_sum: torch.Tensor
+    last_coverage_avg: torch.Tensor
     rewarded_teeth: List[set]
     rewarded_teeth_gum: List[set]
     seen_teeth: List[set]
@@ -46,7 +46,7 @@ class _CoverageState:
         for env_id in ids:
             self.metrics[env_id] = {}
             self.last_update_step[env_id] = -1
-            self.last_coverage_sum[env_id] = 0.0
+            self.last_coverage_avg[env_id] = 0.0
             self.rewarded_teeth[env_id].clear()
             self.rewarded_teeth_gum[env_id].clear()
             self.seen_teeth[env_id].clear()
@@ -144,7 +144,7 @@ def _get_state(env, params: Dict[str, object]) -> _CoverageState:
             tracker=tracker,
             metrics=[{} for _ in range(num_envs)],
             last_update_step=np.full((num_envs,), -1, dtype=np.int64),
-            last_coverage_sum=torch.zeros(num_envs, device=env.device),
+            last_coverage_avg=torch.zeros(num_envs, device=env.device),
             rewarded_teeth=[set() for _ in range(num_envs)],
             rewarded_teeth_gum=[set() for _ in range(num_envs)],
             seen_teeth=[set() for _ in range(num_envs)],
@@ -360,6 +360,45 @@ def scanpoint_far_from_teeth_center(
     return dist > max_distance
 
 
+def scanpoint_out_penalty(
+    env,
+    max_distance: float,
+    resources_root: str,
+    dataset_id: str,
+    num_samples: int,
+    seed: int,
+    gum_assign_radius: float,
+    scale: tuple,
+    camera_name: str = "wrist_camera",
+    teeth_name: str = "teeth",
+    penalty: float = -10.0,
+) -> torch.Tensor:
+    params = {
+        "resources_root": resources_root,
+        "dataset_id": dataset_id,
+        "num_samples": num_samples,
+        "seed": seed,
+        "gum_assign_radius": gum_assign_radius,
+        "scale": scale,
+    }
+    state = _get_teeth_center_state(env, params)
+    camera = env.scene[camera_name]
+    cam_pos, _ = camera._view.get_world_poses()
+
+    teeth = env.scene[teeth_name]
+    teeth_pos = teeth.data.root_pos_w
+    teeth_quat = teeth.data.root_quat_w
+    cam_pos = cam_pos.to(teeth_pos.device)
+
+    center_local = torch.as_tensor(state["center_local"], device=teeth_pos.device)
+    center_local = center_local.unsqueeze(0).expand(teeth_pos.shape[0], -1)
+    center_world = math_utils.quat_apply(teeth_quat, center_local) + teeth_pos
+
+    dist = torch.norm(cam_pos - center_world, dim=1)
+    penalty_val = dist.new_full(dist.shape, float(penalty))
+    return torch.where(dist > float(max_distance), penalty_val, dist.new_zeros(dist.shape))
+
+
 def _build_params(
     resources_root: str,
     dataset_id: str,
@@ -488,17 +527,17 @@ def coverage_delta_reward(
     state = _get_state(env, params)
     state.maybe_update(env)
 
-    coverage_sum = torch.zeros(env.num_envs, device=env.device)
+    coverage_avg = torch.zeros(env.num_envs, device=env.device)
     for env_id in range(env.num_envs):
         metrics = state.metrics[env_id]
         if not metrics:
             continue
         teeth_all = metrics["teeth"]["all"]["coverage"]
         teeth_gum_all = metrics["teeth_gum"]["all"]["coverage"]
-        coverage_sum[env_id] = float(teeth_all + teeth_gum_all)
+        coverage_avg[env_id] = 0.5 * float(teeth_all + teeth_gum_all)
 
-    delta = coverage_sum - state.last_coverage_sum
-    state.last_coverage_sum = coverage_sum
+    delta = coverage_avg - state.last_coverage_avg
+    state.last_coverage_avg = coverage_avg
     if no_progress_penalty:
         penalty = torch.where(
             delta <= 0.0,
@@ -640,7 +679,8 @@ def total_coverage_bonus(
             continue
         teeth_all = metrics["teeth"]["all"]["coverage"]
         teeth_gum_all = metrics["teeth_gum"]["all"]["coverage"]
-        if (teeth_all + teeth_gum_all) >= threshold:
+        avg_coverage = 0.5 * (teeth_all + teeth_gum_all)
+        if avg_coverage >= threshold:
             state.rewarded_total[env_id] = True
             reward[env_id] = 1.0
     return reward

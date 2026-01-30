@@ -79,9 +79,10 @@ class RewardsCfg:
 
     ee_delta = RewTerm(func=scanbot_mdp.ee_delta_l2, weight=-0.1, params={"ee_frame_cfg": SceneEntityCfg("ee_frame")})
     step_penalty = RewTerm(func=scanbot_mdp.step_progress_penalty, weight=-0.4, params={"power": 1.0})
-    coverage_delta = RewTerm(func=scanbot_mdp.coverage_delta_reward, weight=20.0, params={})
+    coverage_delta = RewTerm(func=scanbot_mdp.coverage_delta_reward, weight=40.0, params={})
     per_tooth_bonus = RewTerm(func=scanbot_mdp.per_tooth_coverage_bonus, weight=1.0, params={})
     total_bonus = RewTerm(func=scanbot_mdp.total_coverage_bonus, weight=120.0, params={})
+    range_out_penalty = RewTerm(func=scanbot_mdp.scanpoint_out_penalty, weight=1.0, params={})
 
 
 @configclass
@@ -536,7 +537,7 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
         self.scene.wrist_camera.update_period = 0.1
         self.scene.wrist_camera.height = 128
         self.scene.wrist_camera.width = 128
-        self.scene.wrist_camera.spawn.clipping_range = (0.001, 0.1)
+        self.scene.wrist_camera.spawn.clipping_range = (0.001, 0.05)
 
         # Disable image observations for now (stability first)
         self.image_obs_list = []
@@ -577,7 +578,7 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
             "scale": self.scene.teeth.spawn.scale,
             "pcd_voxel_size": 0.001,
             "pcd_max_points": 60000,
-            "coverage_update_every": 2,
+            "coverage_update_every": 1,
             "camera_name": "wrist_camera",
             "data_type": "distance_to_image_plane",
             "teeth_name": "teeth",
@@ -589,6 +590,18 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
             **self.coverage_plot_params,
             **self.teeth_gum_plot_params,
             no_progress_penalty=-0.05,
+        )
+        self.rewards.range_out_penalty.params = dict(
+            max_distance=0.08,
+            resources_root=self.resources_root,
+            dataset_id=self.teeth_dataset_id,
+            num_samples=20000,
+            seed=0,
+            gum_assign_radius=0.002,
+            scale=self.scene.teeth.spawn.scale,
+            camera_name="wrist_camera",
+            teeth_name="teeth",
+            penalty=-50.0,
         )
         self.rewards.per_tooth_bonus.params = dict(
             self.coverage_params,
