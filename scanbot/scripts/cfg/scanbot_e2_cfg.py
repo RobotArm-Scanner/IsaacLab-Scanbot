@@ -536,7 +536,7 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
         self.scene.wrist_camera.update_period = 0.1
         self.scene.wrist_camera.height = 128
         self.scene.wrist_camera.width = 128
-        self.scene.wrist_camera.spawn.clipping_range = (0.001, 0.04)
+        self.scene.wrist_camera.spawn.clipping_range = (0.001, 0.1)
 
         # Disable image observations for now (stability first)
         self.image_obs_list = []
@@ -588,7 +588,7 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
             self.coverage_params,
             **self.coverage_plot_params,
             **self.teeth_gum_plot_params,
-            no_progress_penalty=-0.1,
+            no_progress_penalty=-0.05,
         )
         self.rewards.per_tooth_bonus.params = dict(
             self.coverage_params,

@@ -454,7 +454,7 @@ def coverage_delta_reward(
     camera_name: str,
     data_type: str,
     teeth_name: str,
-    no_progress_penalty: float = -0.1,
+    no_progress_penalty: float = -0.05,
     coverage_plot: bool = False,
     coverage_plot_interval: int = 1,
     coverage_plot_max_points: int = 200,
