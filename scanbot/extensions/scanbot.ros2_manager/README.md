@@ -74,6 +74,7 @@ Default camera alias (first detected "default"):
 
 Notes:
 - PointCloud2 is generated from RGB+depth using intrinsics and camera pose, and is downsampled using `POINTCLOUD_STRIDE`.
+- You can override `POINTCLOUD_STRIDE` at runtime via `SCANBOT_POINTCLOUD_STRIDE` (set to `1` for raw / no stride).
 - If `CAMERA_USE_COMPRESSED_TRANSPORT` is enabled, `/image_raw/compressed` is provided via `image_transport republish`.
 
 ## Teleport actions

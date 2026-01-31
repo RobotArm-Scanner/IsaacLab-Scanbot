@@ -44,7 +44,19 @@ JOINT_PUB_HZ = 10.0
 # other ROS2 traffic (e.g. teleport actions) when multiple cameras are enabled.
 CAMERA_PUB_HZ = 2.0
 CAMERA_STRIDE = 1
-POINTCLOUD_STRIDE = 8
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name, "").strip()
+    if not value:
+        return default
+    # Avoid try/except spam for a hot-path config module.
+    if not value.lstrip("+-").isdigit():
+        return default
+    return int(value)
+
+
+POINTCLOUD_STRIDE = max(1, _env_int("SCANBOT_POINTCLOUD_STRIDE", 1))
 
 CAMERA_USE_COMPRESSED_TRANSPORT = False
 CAMERA_COMPRESSED_FORMAT = "png"

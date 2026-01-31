@@ -211,6 +211,12 @@ class Extension(omni.ext.IExt):
         action_term = env.action_manager.get_term("arm_action")
         curr_pos, curr_quat = action_term._compute_frame_pose()
 
+        # Apply teleports before publishing state/sensors to avoid a 1-tick lag where
+        # images/joints/poses reflect the pre-teleport state.
+        self._teleport.maybe_update(env, action_term, curr_pos, curr_quat)
+        curr_pos, curr_quat = action_term._compute_frame_pose()
+        self._teleport.maybe_update(env, action_term, curr_pos, curr_quat)
+
         if curr_pos is not None and curr_quat is not None:
             self._tcp_pub.maybe_publish(curr_pos, curr_quat, frame_id="base")
             self._sp_pub.maybe_publish(curr_pos, curr_quat)
@@ -220,8 +226,6 @@ class Extension(omni.ext.IExt):
 
         self._camera_bridge.maybe_publish(env)
         self._marker_bridge.maybe_render(env)
-
-        self._teleport.maybe_update(env, action_term, curr_pos, curr_quat)
 
         if action_term is None or curr_pos is None or curr_quat is None:
             return
