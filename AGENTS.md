@@ -52,3 +52,12 @@ docker/container.sh build scanbot --target scanbot
   - 필요한 테스트가 있으면 `exec_bridge` extension으로 테스트를 해볼 것
   - 항상 존재하는 프로퍼티나 값이라면 이런 Guard를 덕지덕지 붙일 필요가 없음
 - `scanbot/scratch` 경로를 테스트 용으로 자유롭게 써도 됨
+
+# 커밋 메시지 컨벤션
+
+이 프로젝트는 현재 Conventional Commits를 강제하지 않고, 최근 커밋 기준으로 아래 스타일을 사용합니다.
+
+- 기본: `<Verb> <What>` 형태의 영어 명령형(Imperative) 1줄 (첫 글자 대문자, 마침표 없이)
+- 스코프가 필요한 경우: `<Verb> <scope>: <What>` (예: `Fix extension_manager: ignore noisy FS events`)
+- 파일/대상을 보조로 표기할 때는 괄호를 사용할 수 있습니다. (예: `Minor fix (scanbot.sh)`)
+- 자주 쓰는 Verb 예시: `Add`, `Fix`, `Update`, `Move`, `Refactor`, `Rename`, `Simplify`, `Drop`, `Replace`, `Implement`, `Improve`
