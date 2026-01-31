@@ -63,33 +63,23 @@ def main() -> None:
     env_cfg.env_name = args_cli.task
     env_cfg.terminations.time_out = None
 
-    def _env_is_one(name: str) -> bool:
-        return os.getenv(name, "") == "1"
-
     headless = bool(getattr(app_launcher, "_headless", False))
     if not headless:
-        headless = _env_is_one("HEADLESS") or _env_is_one("SCANBOT_HEADLESS")
-    if not headless:
-        headless = not os.getenv("DISPLAY")
+        headless = os.getenv("HEADLESS", "") == "1" or not os.getenv("DISPLAY")
     if not simulation_app.is_running():
         headless = True
-    env = gym.make(args_cli.task, cfg=env_cfg).unwrapped
+    env = gym.make(args_cli.task, cfg=env_cfg)
     if headless:
-        env.cfg.wait_for_textures = False
-        env.cfg.num_rerenders_on_reset = 0
+        env.unwrapped.cfg.wait_for_textures = False
+        env.unwrapped.cfg.num_rerenders_on_reset = 0
     env.reset()
-    scanbot_context.set_env(env)
-
-    zero_action = torch.zeros((env.num_envs, env.action_manager.total_action_dim), device=env.device)
+    zero_action = torch.zeros(
+        (env.unwrapped.num_envs, env.unwrapped.action_manager.total_action_dim),
+        device=env.unwrapped.device,
+    )
 
     try:
         while True:
-            # Execute any queued hooks from extensions outside env.step() to avoid re-entrancy.
-            hook = scanbot_context.pop_hook()
-            while hook is not None:
-                hook()
-                hook = scanbot_context.pop_hook()
-
             action = scanbot_context.pop_action()
             if action is None:
                 action = zero_action
