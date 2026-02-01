@@ -48,6 +48,8 @@ pkill -f train.py
 ```
 
 ## 3. RL 학습 실행 (GUI 모드)
+`train.py`를 수정하지 않고 Scanbot 익스텐션을 같이 켜려면, `--kit_args`에 Scanbot extensions 폴더를 추가하고
+`scanbot.extension_manager`를 enable 하면 됩니다.
 ```bash
 cd /workspace/isaaclab
 set -a && source docker/.env.scanbot && set +a
@@ -56,19 +58,23 @@ set -a && source docker/.env.scanbot && set +a
   --num_envs 4 \
   --max_iterations 200 \
   --enable_cameras \
-  --kit_args "--enable omni.usd.metrics.assembler"
+  --kit_args "--ext-folder /workspace/isaaclab/scanbot/extensions --enable scanbot.extension_manager --enable omni.usd.metrics.assembler"
 ```
 
 ## 4. RL 학습 실행 (헤드리스)
 ```bash
 cd /workspace/isaaclab
+set -a && source docker/.env.scanbot && set +a
+# NOTE: 이 호스트/컨테이너에서 `DISPLAY`가 잡혀있으면 headless 실행 중 GLX 관련 에러가 날 수 있어,
+#       headless에서는 `unset DISPLAY`를 권장합니다.
+unset DISPLAY
 ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py \
   --task e2.t3ds.rl \
   --num_envs 4 \
   --max_iterations 200 \
   --headless \
   --enable_cameras \
-  --kit_args "--enable omni.usd.metrics.assembler"
+  --kit_args "--ext-folder /workspace/isaaclab/scanbot/extensions --enable scanbot.extension_manager --enable omni.usd.metrics.assembler"
 ```
 
 ## 5. 로그/체크포인트
