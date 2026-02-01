@@ -63,6 +63,23 @@
 **해결**
 - `DISPLAY=:3` 등으로 non-headless로 실행하거나, EGL을 올바르게 구성.
 
+## RL 학습: matplotlib Qt GUI 창이 안 뜨거나 xcb 에러로 종료
+**증상**
+- matplotlib 창이 뜨지 않거나 아래 에러로 프로세스가 종료:
+  `Could not load the Qt platform plugin "xcb"`
+
+**해결**
+- Isaac Sim Python에 Qt 바인딩 설치:
+  `/workspace/isaaclab/_isaac_sim/python.sh -m pip install PyQt5`
+- 컨테이너에 xcb 관련 라이브러리 설치:
+  `apt-get update && apt-get install -y libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xkb1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-randr0 libxcb-shape0 libxcb-xfixes0 libxcb-sync1 libxcb-util1`
+- PyQt5만 설치하면 충분하며, 시스템 Python에 설치해도 Isaac Sim에는 반영되지 않음(반드시 `python.sh` 사용).
+- host에서 X 권한 열기:
+  `DISPLAY=:59 xhost +local:`
+- 컨테이너/세션에서:
+  `export DISPLAY=:59`  
+  `export MATPLOTLIB_BACKEND=Qt5Agg`
+
 ## RL 학습: actor_critic이 1D obs를 기대
 **증상**
 - `AssertionError: The ActorCritic module only supports 1D observations.`

@@ -34,6 +34,7 @@ from isaaclab.sim.spawners.from_files.from_files_cfg import UsdFileCfg
 from isaaclab.utils import configclass
 from isaaclab_tasks.manager_based.manipulation.stack import mdp
 from scanbot.scripts import scanbot_mdp
+from scanbot.scripts.rl.debug import config as debug_config
 from scanbot.scripts.utilities.pos_util import quat_wxyz_from_deg_xyz
 from scanbot.scripts.utilities.teeth3ds_util import ensure_t3ds_usd
 from scanbot.scripts.utilities.usd_util import spawn_usd_with_mesh_collision, spawn_rigid_object_from_usd
@@ -76,10 +77,12 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for Scanbot RL."""
 
-    ee_delta = RewTerm(func=scanbot_mdp.ee_delta_l2, weight=-0.05, params={"ee_frame_cfg": SceneEntityCfg("ee_frame")})
-    coverage_delta = RewTerm(func=scanbot_mdp.coverage_delta_reward, weight=5.0, params={})
-    per_tooth_bonus = RewTerm(func=scanbot_mdp.per_tooth_coverage_bonus, weight=2.0, params={})
-    total_bonus = RewTerm(func=scanbot_mdp.total_coverage_bonus, weight=10.0, params={})
+    ee_delta = RewTerm(func=scanbot_mdp.ee_delta_l2, weight=-0.1, params={"ee_frame_cfg": SceneEntityCfg("ee_frame")})
+    step_penalty = RewTerm(func=scanbot_mdp.step_progress_penalty, weight=-0.4, params={"power": 1.0})
+    coverage_delta = RewTerm(func=scanbot_mdp.coverage_delta_reward, weight=40.0, params={})
+    per_tooth_bonus = RewTerm(func=scanbot_mdp.per_tooth_coverage_bonus, weight=1.0, params={})
+    total_bonus = RewTerm(func=scanbot_mdp.total_coverage_bonus, weight=120.0, params={})
+    range_out_penalty = RewTerm(func=scanbot_mdp.scanpoint_out_penalty, weight=1.0, params={})
 
 
 @configclass
@@ -88,8 +91,17 @@ class ScanbotRLObservationsCfg(ObservationsCfg):
 
     @configclass
     class PolicyCfg(ObservationsCfg.PolicyCfg):
+        actions = ObsTerm(func=mdp.last_action)
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+        scanpoint_pos = ObsTerm(func=scanbot_mdp.scanpoint_pos, params={"camera_name": "wrist_camera"})
+        scanpoint_rot_xyz = ObsTerm(
+            func=scanbot_mdp.scanpoint_euler_xyz,
+            params={"camera_name": "wrist_camera", "normalize_quat": True},
+        )
+
         def __post_init__(self):
-            super().__post_init__()
+            self.enable_corruption = False
             self.concatenate_terms = True
 
     policy: PolicyCfg = PolicyCfg()
@@ -498,6 +510,16 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
         self.sim.render_interval = 1
         self.episode_length_s = 20.0
         self.actions.arm_action.scale = 0.01
+        # self.sim.render.rendering_mode = "quality"
+        # self.sim.render.enable_translucency = True
+        # self.sim.render.enable_reflections = True
+        # self.sim.render.enable_global_illumination = True
+        # self.sim.render.carb_settings = {
+        #     "/rtx/rendermode": "PathTracing",
+        #     "/rtx/raytracing/fractionalCutoutOpacity": True,
+        #     "/rtx/material/translucencyAsOpacity": True,
+        #     "/rtx/translucency/maxRefractionBounces": 6,
+        # }
 
         # Observation: do not include action history
         self.observations = ScanbotRLObservationsCfg()
@@ -515,6 +537,7 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
         self.scene.wrist_camera.update_period = 0.1
         self.scene.wrist_camera.height = 128
         self.scene.wrist_camera.width = 128
+        self.scene.wrist_camera.spawn.clipping_range = (0.001, 0.05)
 
         # Disable image observations for now (stability first)
         self.image_obs_list = []
@@ -524,12 +547,23 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
 
         # Terminations (failure conditions)
         self.terminations.scanpoint_far_from_support = DoneTerm(
-            func=scanbot_mdp.scanpoint_far_from_support,
-            params={
-                "max_distance": 0.3,
-                "camera_name": "wrist_camera",
-                "support_name": "teeth_support",
-            },
+            func=scanbot_mdp.scanpoint_far_from_teeth_center,
+            params=dict(
+                {
+                    "max_distance": 0.08,
+                    "resources_root": self.resources_root,
+                    "dataset_id": self.teeth_dataset_id,
+                    "num_samples": 20000,
+                    "seed": 0,
+                    "gum_assign_radius": 0.002,
+                    "scale": self.scene.teeth.spawn.scale,
+                    "camera_name": "wrist_camera",
+                    "teeth_name": "teeth",
+                },
+                **debug_config.scanpoint_debug_params(),
+                **debug_config.reward_plot_params(),
+                **debug_config.tcp_traj_plot_params(),
+            ),
         )
 
         self.coverage_threshold_tooth = 0.8
@@ -544,17 +578,41 @@ class ScanbotE2RLT3DSCfg(ScanbotE2T3DSCfg):
             "scale": self.scene.teeth.spawn.scale,
             "pcd_voxel_size": 0.001,
             "pcd_max_points": 60000,
-            "coverage_update_every": 2,
+            "coverage_update_every": 1,
             "camera_name": "wrist_camera",
             "data_type": "distance_to_image_plane",
             "teeth_name": "teeth",
         }
-        self.rewards.coverage_delta.params = dict(self.coverage_params)
+        self.coverage_plot_params = debug_config.coverage_plot_params()
+        self.teeth_gum_plot_params = debug_config.teeth_gum_plot_params()
+        self.rewards.coverage_delta.params = dict(
+            self.coverage_params,
+            **self.coverage_plot_params,
+            **self.teeth_gum_plot_params,
+            no_progress_penalty=-0.05,
+        )
+        self.rewards.range_out_penalty.params = dict(
+            max_distance=0.08,
+            resources_root=self.resources_root,
+            dataset_id=self.teeth_dataset_id,
+            num_samples=20000,
+            seed=0,
+            gum_assign_radius=0.002,
+            scale=self.scene.teeth.spawn.scale,
+            camera_name="wrist_camera",
+            teeth_name="teeth",
+            penalty=-50.0,
+        )
         self.rewards.per_tooth_bonus.params = dict(
             self.coverage_params,
             threshold=self.coverage_threshold_tooth,
+            first_hit_reward=0.1,
         )
         self.rewards.total_bonus.params = dict(
             self.coverage_params,
             threshold=self.coverage_threshold_total,
+        )
+        self.terminations.teeth_coverage_reached = DoneTerm(
+            func=scanbot_mdp.teeth_coverage_reached,
+            params=dict(self.coverage_params, threshold=self.coverage_threshold_total),
         )
