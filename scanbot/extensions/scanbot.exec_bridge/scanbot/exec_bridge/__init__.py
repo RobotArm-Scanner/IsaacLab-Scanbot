@@ -131,16 +131,37 @@ class Extension(omni.ext.IExt):
         self._ext_id = ext_id
 
         self._host = os.getenv("SCANBOT_EXEC_BRIDGE_HOST", "127.0.0.1")
-        self._port = int(os.getenv("SCANBOT_EXEC_BRIDGE_PORT", "7311"))
+        requested_port = int(os.getenv("SCANBOT_EXEC_BRIDGE_PORT", "7311"))
         self._token = os.getenv("SCANBOT_EXEC_BRIDGE_TOKEN", "")
         self._max_body_bytes = int(os.getenv("SCANBOT_EXEC_MAX_BYTES", "1000000"))
         self._default_timeout = float(os.getenv("SCANBOT_EXEC_TIMEOUT_SEC", "5.0"))
 
-        try:
-            self._server = _ExecHTTPServer((self._host, self._port), _ExecHandler, bridge=self)
-        except Exception as exc:
-            carb.log_error(f"[scanbot.exec_bridge] Failed to bind {self._host}:{self._port}: {exc}")
-            self._server = None
+        max_bind_attempts = int(os.getenv("SCANBOT_EXEC_BRIDGE_MAX_BIND_ATTEMPTS", "50"))
+        max_bind_attempts = max(1, min(max_bind_attempts, 10_000))
+
+        self._server = None
+        last_exc: Exception | None = None
+        for offset in range(max_bind_attempts):
+            candidate_port = requested_port + offset
+            if candidate_port > 65535:
+                break
+            try:
+                self._server = _ExecHTTPServer((self._host, candidate_port), _ExecHandler, bridge=self)
+                self._port = candidate_port
+                break
+            except Exception as exc:
+                last_exc = exc
+                carb.log_warn(
+                    f"[scanbot.exec_bridge] Failed to bind {self._host}:{candidate_port}: {exc} "
+                    f"(trying {candidate_port + 1}...)"
+                )
+
+        if self._server is None:
+            detail = f": {last_exc}" if last_exc is not None else ""
+            carb.log_error(
+                f"[scanbot.exec_bridge] Failed to bind {self._host}:{requested_port} "
+                f"after {max_bind_attempts} attempt(s){detail}"
+            )
             return
 
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
