@@ -12,7 +12,7 @@ from scanbot.scripts.cfg.scanbot_e2_cfg import (
 # Register a cleaner Gym id so we don't rely on the franka.* namespace.
 gym.register(
     id="e2",
-    entry_point="scanbot.scripts.scanbot_entrypoints:make_manager_env",
+    entry_point="scanbot.scripts.scanbot_entrypoints:create_scanbot_env",
     kwargs={
         "env_cfg_entry_point": ScanbotE2Cfg,
     },
@@ -21,7 +21,7 @@ gym.register(
 
 gym.register(
     id="e2.t1",
-    entry_point="scanbot.scripts.scanbot_entrypoints:make_manager_env",
+    entry_point="scanbot.scripts.scanbot_entrypoints:create_scanbot_env",
     kwargs={
         "env_cfg_entry_point": ScanbotE2Cfg,
     },
@@ -30,7 +30,7 @@ gym.register(
 
 gym.register(
     id="e2.t1.rt1",
-    entry_point="scanbot.scripts.scanbot_entrypoints:make_manager_env",
+    entry_point="scanbot.scripts.scanbot_entrypoints:create_scanbot_env",
     kwargs={
         "env_cfg_entry_point": ScanbotE2T1RT1Cfg,
     },
@@ -39,7 +39,7 @@ gym.register(
 
 gym.register(
     id="e2.t2.rt1",
-    entry_point="scanbot.scripts.scanbot_entrypoints:make_manager_env",
+    entry_point="scanbot.scripts.scanbot_entrypoints:create_scanbot_env",
     kwargs={
         "env_cfg_entry_point": ScanbotE2T2RT1Cfg,
     },
@@ -48,7 +48,7 @@ gym.register(
 
 gym.register(
     id="e2.t3ds",
-    entry_point="scanbot.scripts.scanbot_entrypoints:make_manager_env",
+    entry_point="scanbot.scripts.scanbot_entrypoints:create_scanbot_env",
     kwargs={
         "env_cfg_entry_point": ScanbotE2T3DSCfg,
     },
@@ -57,7 +57,7 @@ gym.register(
 
 gym.register(
     id="e2.t3ds.rl",
-    entry_point="scanbot.scripts.scanbot_entrypoints:make_manager_env",
+    entry_point="scanbot.scripts.scanbot_entrypoints:create_scanbot_env",
     kwargs={
         "env_cfg_entry_point": ScanbotE2RLT3DSCfg,
         "rsl_rl_cfg_entry_point": "scanbot.scripts.rl.rsl_rl_ppo_cfg:ScanbotE2T3DSRLPPORunnerCfg",

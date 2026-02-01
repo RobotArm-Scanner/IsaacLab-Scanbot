@@ -1,6 +1,6 @@
 """Gym entry points for Scanbot environments.
 
-These wrappers allow setting up Scanbot shared context without modifying upstream training scripts.
+This wrapper allows setting up Scanbot shared context without modifying upstream training scripts.
 """
 
 from __future__ import annotations
@@ -12,8 +12,8 @@ from isaaclab.envs import ManagerBasedRLEnv
 from scanbot.scripts import scanbot_context
 
 
-class _ScanbotContextWrapper(gym.Wrapper):
-    """Integrate Scanbot shared context into a gym environment.
+class ScanbotExtensibleEnv(gym.Wrapper):
+    """Gym env wrapper that integrates Scanbot shared context.
 
     - Registers the unwrapped env in ``scanbot_context`` after the first reset.
     - Drains queued hooks outside of ``env.step()`` to avoid re-entrancy issues.
@@ -44,10 +44,10 @@ class _ScanbotContextWrapper(gym.Wrapper):
         return self.env.step(action)
 
 
-def make_manager_env(*, cfg, render_mode=None, **kwargs):
-    """Factory for ManagerBasedRLEnv with Scanbot context bootstrap.
+def create_scanbot_env(*, cfg, render_mode=None, **kwargs):
+    """Factory for IsaacLab gym env with Scanbot context bootstrap.
 
     Args are aligned with IsaacLab's gym.make(..., cfg=..., render_mode=...).
     """
     env = ManagerBasedRLEnv(cfg=cfg, render_mode=render_mode, **kwargs)
-    return _ScanbotContextWrapper(env)
+    return ScanbotExtensibleEnv(env)
